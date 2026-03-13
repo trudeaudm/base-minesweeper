@@ -1,0 +1,69 @@
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { BaseLogo } from "./BaseLogo";
+import { usePoolHealth } from "@/hooks/usePoolHealth";
+import { formatEth, GRID_INFO, GRID_SMALL, GRID_MEDIUM, GRID_LARGE } from "@/lib/config";
+
+export function LandingHero() {
+  const { pool, isLoading } = usePoolHealth();
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center">
+      {/* Logo */}
+      <div className="mb-8 animate-bounce-in">
+        <div className="w-20 h-20 bg-base-blue rounded-full flex items-center justify-center mx-auto mb-4 shadow-cashout">
+          <BaseLogo size={44} />
+        </div>
+        <h1 className="text-4xl font-bold text-white">Base Minesweeper</h1>
+        <p className="text-white/60 mt-2 text-lg">
+          Onchain wagering · Provably fair · Base Chain
+        </p>
+      </div>
+
+      {/* Feature bullets */}
+      <div className="grid grid-cols-1 gap-3 mb-8 w-full max-w-xs">
+        {[
+          { icon: "⚡", text: "Instant payouts via smart contract" },
+          { icon: "🔐", text: "Chainlink VRF randomness" },
+          { icon: "💸", text: "Cash out any time — no gas popup" },
+          { icon: "🏆", text: "Up to 1.95× your entry fee" },
+        ].map(({ icon, text }) => (
+          <div key={text} className="flex items-center gap-3 text-left px-4 py-3 bg-white/5 rounded-lg">
+            <span className="text-xl">{icon}</span>
+            <span className="text-white/70 text-sm">{text}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Pool status per grid */}
+      <div className="w-full max-w-xs mb-8">
+        <div className="text-xs text-white/40 uppercase tracking-widest mb-2">Pool Balance</div>
+        <div className="space-y-1.5">
+          {[GRID_SMALL, GRID_MEDIUM, GRID_LARGE].map(g => {
+            const info   = GRID_INFO[g as 0|1|2];
+            const hasFunds = pool >= info.entryFee * 2n;
+            return (
+              <div key={g} className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-lg">
+                <span className="text-white/70 text-sm">{info.label} ({info.entryLabel})</span>
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${hasFunds ? "bg-accent-green" : "bg-mine"}`} />
+                  <span className={`text-xs font-mono ${hasFunds ? "text-accent-green" : "text-mine"}`}>
+                    {isLoading ? "…" : hasFunds ? "Available" : "Unavailable"}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-2 text-right text-xs font-mono text-white/30">
+          Pool: {isLoading ? "…" : formatEth(pool, 4)} ETH
+        </div>
+      </div>
+
+      {/* CTA */}
+      <div className="space-y-3">
+        <p className="text-white/50 text-sm mb-1">Connect your wallet to play</p>
+        <ConnectButton />
+      </div>
+    </div>
+  );
+}
