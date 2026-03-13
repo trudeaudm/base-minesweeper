@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { Minesweeper, VRFCoordinatorV2Mock } from "../typechain-types";
+import { Minesweeper, VRFCoordinatorV2_5Mock } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 // ─────────────────────────────────────────────────────────────
@@ -36,22 +36,26 @@ enum GameStatus {
 async function deployFixture() {
   const [owner, player, player2, sessionKey] = await ethers.getSigners();
 
-  // Deploy mock VRF coordinator
-  const MockFactory = await ethers.getContractFactory("VRFCoordinatorV2Mock");
-  const vrfMock = (await MockFactory.deploy(
-    ethers.parseUnits("0.25", 9), // baseFee (LINK)
-    ethers.parseUnits("1",    9)  // gasPriceLink
-  )) as VRFCoordinatorV2Mock;
+  // Deploy VRF v2.5 mock coordinator
+  // baseFee=0, gasPrice=0, weiPerUnitLink=1 → zero-cost fulfillment in tests
+  const MockFactory = await ethers.getContractFactory("VRFCoordinatorV2_5Mock");
+  const vrfMock = (await MockFactory.deploy(0n, 0n, 1n)) as VRFCoordinatorV2_5Mock;
 
-  // Create VRF subscription
+  // Create VRF subscription and extract subId from event
   const createSubTx = await vrfMock.createSubscription();
-  const receipt     = await createSubTx.wait();
-  const subId       = 1n; // first sub
+  const createSubReceipt = await createSubTx.wait();
+  const subCreatedLog = createSubReceipt!.logs.find((log) => {
+    try {
+      return vrfMock.interface.parseLog(log as any)?.name === "SubscriptionCreated";
+    } catch { return false; }
+  });
+  const parsedSub = vrfMock.interface.parseLog(subCreatedLog as any);
+  const subId = parsedSub!.args.subId as bigint;
 
   // Deploy game contract
-  const MineFactory  = await ethers.getContractFactory("Minesweeper");
-  const KEY_HASH     = ethers.id("test-key-hash");
-  const minesweeper  = (await MineFactory.deploy(
+  const MineFactory = await ethers.getContractFactory("Minesweeper");
+  const KEY_HASH    = ethers.id("test-key-hash");
+  const minesweeper = (await MineFactory.deploy(
     await vrfMock.getAddress(),
     KEY_HASH,
     subId
@@ -72,7 +76,7 @@ async function deployFixture() {
  */
 async function startAndFulfil(
   minesweeper: Minesweeper,
-  vrfMock:     VRFCoordinatorV2Mock,
+  vrfMock:     VRFCoordinatorV2_5Mock,
   player:      HardhatEthersSigner,
   gridSize:    number,
   difficulty:  number,
@@ -94,12 +98,16 @@ async function startAndFulfil(
     } catch { return false; }
   });
   const parsed = minesweeper.interface.parseLog(gameStartedLog as any);
-  const gameId    = parsed!.args.gameId    as bigint;
-  const vrfReqId  = parsed!.args.vrfRequestId as bigint;
+  const gameId   = parsed!.args.gameId   as bigint;
+  const vrfReqId = parsed!.args.vrfRequestId as bigint;
 
-  // Fulfil VRF
+  // Fulfil VRF with override words for deterministic outcomes
   const words = [BigInt(ethers.id(randomSeed.toString()))];
-  await vrfMock.fulfillRandomWords(vrfReqId, words);
+  await vrfMock.fulfillRandomWordsWithOverride(
+    vrfReqId,
+    await minesweeper.getAddress(),
+    words
+  );
 
   return gameId;
 }
@@ -234,22 +242,26 @@ describe("Minesweeper", () => {
     });
 
     it("rejects when pool insufficient", async () => {
-      const { minesweeper, owner, player } = await loadFixture(deployFixture);
-      // Drain pool
-      await minesweeper.connect(owner).withdrawPoolProfits(
-        await minesweeper.poolBalance() - 1n
-      ).catch(() => {}); // might revert due to floor, that's ok
-      // Force pool to near 0 by setting a huge floor manually is complex;
-      // instead deploy a fresh contract with no pool seed
-      const MockFactory = await ethers.getContractFactory("VRFCoordinatorV2Mock");
-      const vrfMock2 = await MockFactory.deploy(0n, 0n);
-      await vrfMock2.createSubscription();
-      const MineFactory  = await ethers.getContractFactory("Minesweeper");
+      // Deploy a fresh contract with no pool seed to trigger "Insufficient pool"
+      const MockFactory = await ethers.getContractFactory("VRFCoordinatorV2_5Mock");
+      const vrfMock2 = await MockFactory.deploy(0n, 0n, 1n);
+      const createTx = await vrfMock2.createSubscription();
+      const createRcpt = await createTx.wait();
+      const subLog = createRcpt!.logs.find((log) => {
+        try { return vrfMock2.interface.parseLog(log as any)?.name === "SubscriptionCreated"; }
+        catch { return false; }
+      });
+      const subId2 = (vrfMock2.interface.parseLog(subLog as any)!.args.subId) as bigint;
+
+      const MineFactory = await ethers.getContractFactory("Minesweeper");
       const ms2 = await MineFactory.deploy(
         await vrfMock2.getAddress(),
         ethers.id("kh"),
-        1n
+        subId2
       ) as Minesweeper;
+      await vrfMock2.addConsumer(subId2, await ms2.getAddress());
+
+      const [, player] = await ethers.getSigners();
       await expect(
         ms2.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
           value: ENTRY_SMALL,
@@ -397,7 +409,6 @@ describe("Minesweeper", () => {
       const { minesweeper, vrfMock, player } = await loadFixture(deployFixture);
       const { pool: poolBefore } = await minesweeper.getPoolHealth();
       const gameId   = await startAndFulfil(minesweeper, vrfMock, player, GRID_SMALL, DIFF_NORMAL);
-      const { pool: poolDuringGame } = await minesweeper.getPoolHealth();
       const mineTiles = await getMineTiles(minesweeper, gameId);
       await minesweeper.connect(player).flipTile(gameId, mineTiles[0]);
       const { pool: poolAfter } = await minesweeper.getPoolHealth();
@@ -436,7 +447,6 @@ describe("Minesweeper", () => {
       const received = balAfter + gasUsed - balBefore;
 
       // Expected payout: maxPayout × (half / totalSafe)
-      const g         = await minesweeper.getGame(gameId);
       const maxPayout = ENTRY_SMALL * 190n / 100n;
       const expected  = maxPayout * BigInt(half) / BigInt(safeTiles.length);
       expect(received).to.equal(expected);
@@ -524,8 +534,7 @@ describe("Minesweeper", () => {
         await minesweeper.connect(player).flipTile(gameId, tile);
       }
       await minesweeper.connect(player).flipTile(gameId, safeTiles[safeTiles.length - 1]);
-      // After auto-cashout game is over; payout was emitted in event
-      // We check the reserved balance is fully released
+      // After auto-cashout game is over; check reserved balance fully released
       const { reserved } = await minesweeper.getPoolHealth();
       expect(reserved).to.equal(0n);
     });
@@ -585,7 +594,7 @@ describe("Minesweeper", () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await expect(
         minesweeper.connect(player).withdrawFees()
-      ).to.be.revertedWithCustomError(minesweeper, "OwnableUnauthorizedAccount");
+      ).to.be.revertedWith("Only callable by owner");
     });
 
     it("owner can set platform fee", async () => {

@@ -2,11 +2,12 @@ import { type TileState } from "@/hooks/useGame";
 import { BaseMineIcon } from "./BaseLogo";
 
 interface TileProps {
-  index:      number;
-  state:      TileState;
-  onClick:    (index: number) => void;
-  disabled:   boolean;
-  isCashout?: boolean; // pulsing cashout state
+  index:          number;
+  state:          TileState;
+  adjacentCount?: number;
+  onClick:        (index: number) => void;
+  disabled:       boolean;
+  isCashout?:     boolean; // pulsing cashout state
 }
 
 // Classic minesweeper number colors
@@ -25,6 +26,7 @@ const NUMBER_COLORS = [
 export function Tile({
   index,
   state,
+  adjacentCount,
   onClick,
   disabled,
   isCashout = false,
@@ -53,6 +55,7 @@ export function Tile({
   }
 
   if (state === "safe") {
+    const n = adjacentCount ?? 0;
     return (
       <div
         className="
@@ -63,9 +66,11 @@ export function Tile({
           animate-tile-flip
         "
       >
-        <span className={`text-xs font-bold font-mono ${NUMBER_COLORS[1]}`}>
-          {/* Safe tile — blank for now; could show adjacent mine count */}
-        </span>
+        {n > 0 && (
+          <span className={`text-xs font-bold font-mono select-none ${NUMBER_COLORS[n]}`}>
+            {n}
+          </span>
+        )}
       </div>
     );
   }

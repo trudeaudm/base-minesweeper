@@ -71,6 +71,7 @@ function GameApp() {
             <GameBoard
               gridSize={gameState.gridSize}
               tileStates={gameState.tileStates}
+              mineBitmask={gameState.mineBitmask}
               status={gameState.status}
               onFlip={flipTile}
               isCashout={gameState.safeRevealed > 0}

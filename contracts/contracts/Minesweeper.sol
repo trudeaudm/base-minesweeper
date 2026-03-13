@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
-import "@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
+import "@chainlink/contracts/src/v0.8/vrf/dev/interfaces/IVRFCoordinatorV2Plus.sol";
+import "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title Minesweeper
  * @notice Onchain Minesweeper wagering game on Base Chain.
  *         Players wager ETH, flip tiles, and can cash out at any point.
- *         Mine placement is determined by Chainlink VRF for provable fairness.
+ *         Mine placement is determined by Chainlink VRF v2.5 for provable fairness.
  *
  * Grid sizes (all 5 tiles wide, portrait orientation):
  *   0 → 5×4  = 20 tiles   Entry: 0.001 ETH
@@ -25,7 +25,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * Payout curve (linear): multiplier = (safeRevealed / totalSafe) × maxMultiplier
  *   where maxMultiplier = 1.9× (EASY/NORMAL) or 1.95× (HARD)
  */
-contract Minesweeper is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
+contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
 
     // ─────────────────────────────────────────────
     // Enums & Constants
@@ -114,12 +114,11 @@ contract Minesweeper is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
     uint16 public platformFeeBPS = 500; // 5% (500 / 10000)
 
     // ─────────────────────────────────────────────
-    // Chainlink VRF v2
+    // Chainlink VRF v2.5
     // ─────────────────────────────────────────────
 
-    VRFCoordinatorV2Interface public immutable vrfCoordinator;
     bytes32 public vrfKeyHash;
-    uint64  public vrfSubscriptionId;
+    uint256 public vrfSubscriptionId;
     uint32  public vrfCallbackGasLimit = 500_000;
     uint16  public vrfRequestConfirmations = 3;
 
@@ -162,7 +161,7 @@ contract Minesweeper is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
     event ProfitWithdrawn(address indexed owner, uint256 amount);
     event PoolDeposited(address indexed sender, uint256 amount);
     event SessionKeySet(uint256 indexed gameId, address indexed sessionKey);
-    event VRFConfigUpdated(bytes32 keyHash, uint64 subscriptionId, uint32 callbackGasLimit);
+    event VRFConfigUpdated(bytes32 keyHash, uint256 subscriptionId, uint32 callbackGasLimit);
 
     // ─────────────────────────────────────────────
     // Constructor
@@ -171,13 +170,11 @@ contract Minesweeper is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
     constructor(
         address _vrfCoordinator,
         bytes32 _keyHash,
-        uint64  _subscriptionId
+        uint256 _subscriptionId
     )
-        VRFConsumerBaseV2(_vrfCoordinator)
-        Ownable(msg.sender)
+        VRFConsumerBaseV2Plus(_vrfCoordinator)
     {
-        vrfCoordinator   = VRFCoordinatorV2Interface(_vrfCoordinator);
-        vrfKeyHash       = _keyHash;
+        vrfKeyHash        = _keyHash;
         vrfSubscriptionId = _subscriptionId;
 
         // ── Grid configs ──
@@ -304,13 +301,18 @@ contract Minesweeper is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
 
         playerActiveGame[msg.sender] = gameId;
 
-        // Request randomness
-        uint256 reqId = vrfCoordinator.requestRandomWords(
-            vrfKeyHash,
-            vrfSubscriptionId,
-            vrfRequestConfirmations,
-            vrfCallbackGasLimit,
-            1
+        // Request randomness via VRF v2.5
+        uint256 reqId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash:             vrfKeyHash,
+                subId:               vrfSubscriptionId,
+                requestConfirmations: vrfRequestConfirmations,
+                callbackGasLimit:    vrfCallbackGasLimit,
+                numWords:            1,
+                extraArgs:           VRFV2PlusClient._argsToBytes(
+                                         VRFV2PlusClient.ExtraArgsV1({ nativePayment: false })
+                                     )
+            })
         );
         games[gameId].vrfRequestId = reqId;
         vrfRequestToGame[reqId]    = gameId;
@@ -446,12 +448,12 @@ contract Minesweeper is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
     }
 
     // ─────────────────────────────────────────────
-    // Chainlink VRF Callback
+    // Chainlink VRF v2.5 Callback
     // ─────────────────────────────────────────────
 
     function fulfillRandomWords(
         uint256 requestId,
-        uint256[] memory randomWords
+        uint256[] calldata randomWords
     ) internal override {
         uint256 gameId = vrfRequestToGame[requestId];
         require(gameId != 0, "Unknown request");
@@ -635,7 +637,7 @@ contract Minesweeper is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
 
     function setVRFConfig(
         bytes32 keyHash,
-        uint64  subscriptionId,
+        uint256 subscriptionId,
         uint32  callbackGasLimit
     ) external onlyOwner {
         vrfKeyHash          = keyHash;
