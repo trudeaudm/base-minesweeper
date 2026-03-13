@@ -2,12 +2,14 @@
   "name": "minesweeper-relayer",
   "version": "1.0.0",
   "description": "Gas relayer – funds ephemeral session keys so tile flips require no wallet popup",
+  "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "build": "tsc",
-    "start": "node dist/index.js",
     "dev":   "tsx watch src/index.ts"
   },
   "dependencies": {
+    "dotenv":  "^16.4.5",
     "express": "^4.19.2",
     "viem":    "^2.16.3"
   },
