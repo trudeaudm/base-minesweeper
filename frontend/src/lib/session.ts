@@ -1,22 +1,27 @@
 /**
  * Session Key Management
  *
- * A session key is an ephemeral Ethereum account (private key) held in the
- * browser's sessionStorage. The player signs once at game start authorising
- * this address to flip tiles on their behalf.
+ * An ephemeral Ethereum keypair lives in sessionStorage for the lifetime of one
+ * game. The player authorises this address in startGame() (1 wallet popup).
+ * Every subsequent tile flip and cashout is signed directly by the session key
+ * – no wallet interaction required.
  *
- * The session key signs real Ethereum transactions. For a production deployment
- * a relayer (e.g. Privy, Alchemy Account Kit, or a custom backend) pays the
- * gas for session-key-signed transactions so the player never sees a gas popup
- * while playing.
+ * Gas funding:
+ *   After startGame confirms, the frontend calls POST /fund on the relayer
+ *   service which sends a small amount of ETH to the session key address.
+ *   On Base L2 this covers hundreds of flips for ~$0.25 per game.
  *
- * For this scaffold we generate the keypair locally and expose helpers to:
- *   - generate / load / clear a session key
- *   - sign tile-flip transactions (for use with a relayer)
+ * Helpers exported:
+ *   getOrCreateSessionKey()      – generate/load the ephemeral Account
+ *   getSessionKey()              – retrieve current Account (null if none)
+ *   clearSessionKey()            – remove from storage on game end
+ *   getSessionKeyAddress()       – convenience: address string or null
+ *   createSessionWalletClient()  – viem WalletClient that signs as session key
  */
 
+import { createWalletClient, http } from "viem";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
-import type { Account } from "viem";
+import type { Account, Chain } from "viem";
 
 const STORAGE_KEY = "minesweeper_session_pk";
 
@@ -46,4 +51,21 @@ export function clearSessionKey(): void {
 export function getSessionKeyAddress(): `0x${string}` | null {
   const acc = getSessionKey();
   return acc?.address ?? null;
+}
+
+/**
+ * Create a viem WalletClient backed by the current session key private key.
+ * Returns null if no session key is loaded yet.
+ *
+ * The resulting client submits transactions directly to the RPC endpoint
+ * (bypassing the user's wallet), so the player sees no popup.
+ */
+export function createSessionWalletClient(chain: Chain, rpcUrl: string) {
+  const pk = sessionStorage.getItem(STORAGE_KEY) as `0x${string}` | null;
+  if (!pk) return null;
+  return createWalletClient({
+    account:   privateKeyToAccount(pk),
+    chain,
+    transport: http(rpcUrl),
+  });
 }

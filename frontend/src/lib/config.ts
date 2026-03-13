@@ -9,6 +9,19 @@ export const CHAIN_ID = Number(import.meta.env.VITE_CHAIN_ID || "84532");
 export const SUPPORTED_CHAIN: Chain =
   CHAIN_ID === 8453 ? base : baseSepolia;
 
+/** Public RPC used by session-key wallet clients (no wallet provider involved). */
+export const RPC_URL: string =
+  import.meta.env.VITE_RPC_URL ||
+  (CHAIN_ID === 8453 ? "https://mainnet.base.org" : "https://sepolia.base.org");
+
+/**
+ * URL of the gas relayer service (POST /fund).
+ * When set, tile flips and cashouts are submitted by the ephemeral session key
+ * (no wallet popup). When unset the app falls back to the connected wallet.
+ */
+export const RELAYER_URL: string | null =
+  import.meta.env.VITE_RELAYER_URL || null;
+
 // Grid sizes
 export const GRID_SMALL  = 0;
 export const GRID_MEDIUM = 1;
