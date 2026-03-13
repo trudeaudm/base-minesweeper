@@ -17,8 +17,11 @@ async function main() {
   const receipt = await tx.wait();
   console.log("Confirmed in block", receipt?.blockNumber);
 
-  const [, pool] = await minesweeper.getPoolHealth();
-  console.log("Pool balance after seed:", ethers.formatEther(pool), "ETH");
+  const [pool, reserved, fees, contractBal] = await minesweeper.getPoolHealth();
+  console.log("Pool balance after seed  :", ethers.formatEther(pool), "ETH");
+  console.log("Reserved (active games)  :", ethers.formatEther(reserved), "ETH");
+  console.log("Fee balance              :", ethers.formatEther(fees), "ETH");
+  console.log("Contract ETH balance     :", ethers.formatEther(contractBal), "ETH");
 }
 
 main().catch((err) => {
