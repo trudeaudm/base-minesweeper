@@ -91,12 +91,19 @@ function buildTileStates(
 }
 
 /**
- * Ask the relayer to fund the session key for this game.
- * Fire-and-forget: the session key will have gas long before VRF resolves.
+ * Ask the relayer to fund the session key for this game, then wait for the
+ * funding transaction to be confirmed on-chain before returning.
+ *
+ * Must complete before the first flip is allowed: the session key needs ETH
+ * to pay for the firstFlip gas, not just for subsequent flipTile calls.
+ *
+ * Non-throwing: on any failure we log and return so the caller can still
+ * proceed (worst-case the player gets a wallet popup instead).
  */
 async function requestRelayerFunding(
   gameId: bigint,
   sessionKeyAddress: `0x${string}`,
+  publicClient: ReturnType<typeof usePublicClient> | undefined,
 ): Promise<void> {
   if (!RELAYER_URL) return;
   try {
@@ -110,6 +117,14 @@ async function requestRelayerFunding(
     });
     if (!res.ok) {
       console.warn("[relayer] fund failed:", await res.text());
+      return;
+    }
+    const data = await res.json() as { ok: boolean; hash?: `0x${string}`; alreadyFunded?: boolean };
+    // Wait for the ETH transfer to land so the session key has gas before
+    // firstFlip is submitted.  Base Sepolia finalises in ~2 s so this adds
+    // negligible delay to the loading spinner.
+    if (data.hash && publicClient) {
+      await publicClient.waitForTransactionReceipt({ hash: data.hash, timeout: 30_000 });
     }
   } catch (err) {
     // Non-fatal: worst case the player gets a wallet popup for flips
@@ -246,6 +261,11 @@ export function useGame() {
         const started = logs.find(l => l.eventName === "GameStarted");
         if (started) {
           const gameId = (started.args as { gameId: bigint }).gameId;
+          // Fund the session key BEFORE showing the clickable board.
+          // firstFlip itself needs gas – the session key must have ETH before
+          // the player can click, not just before VRF resolves.
+          await requestRelayerFunding(gameId, sk, publicClient ?? undefined);
+
           setGameState(prev => ({
             ...prev,
             gameId,
@@ -255,11 +275,6 @@ export function useGame() {
           }));
           refetchGame();
           refetchActiveGame();
-
-          // Ask relayer to fund the session key with gas money.
-          // Happens in background while VRF resolves (~30-60 s), so by the
-          // time the player can flip any tile the session key has ETH.
-          requestRelayerFunding(gameId, sk);
         }
       }
     } catch (e: unknown) {
