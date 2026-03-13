@@ -1,6 +1,13 @@
-import { HardhatUserConfig } from "hardhat/config";
+import { HardhatUserConfig, subtask } from "hardhat/config";
+import { TASK_COMPILE_GET_REMAPPINGS } from "hardhat/builtin-tasks/task-names";
 import "@nomicfoundation/hardhat-toolbox";
 import * as dotenv from "dotenv";
+
+// Chainlink VRF v2.5 uses versioned OZ imports like @openzeppelin/contracts@4.9.6/...
+// npm installs these as aliases under @openzeppelin/contracts-4.9.6/, so we remap them.
+subtask(TASK_COMPILE_GET_REMAPPINGS, async () => ({
+  "@openzeppelin/contracts@4.9.6/": "@openzeppelin/contracts-4.9.6/",
+}));
 
 dotenv.config();
 
