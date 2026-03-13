@@ -11,13 +11,13 @@ async function main() {
   console.log("Balance: ", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETH");
 
   // ── VRF Config ────────────────────────────────────────────────
-  // Base Sepolia Chainlink VRF v2
-  // See: https://docs.chain.link/vrf/v2/subscription/supported-networks
+  // Base Sepolia Chainlink VRF v2.5
+  // See: https://docs.chain.link/vrf/v2-5/supported-networks
   const VRF_COORDINATOR = process.env.VRF_COORDINATOR ||
-    "0x5C210eF41CD1a72de73bF76eD3291d1Ab7DB7B61"; // Base Sepolia
+    "0x5C210eF41CD1a72de73bF76eC39637bB0d3d7BEE"; // Base Sepolia VRF v2.5
 
   const VRF_KEYHASH = process.env.VRF_KEYHASH ||
-    "0x816bedba8a50b294e5cbd47842baf240c2385f2eaf719edbd4f250a137a8c899"; // 150 gwei lane
+    "0x9e1344a1247c8a1785d0a4681a27152bffdb43666ae5bf7d14d24a5efd44bf71"; // 30 gwei lane
 
   const VRF_SUBSCRIPTION_ID = BigInt(process.env.VRF_SUBSCRIPTION_ID || "0");
 
