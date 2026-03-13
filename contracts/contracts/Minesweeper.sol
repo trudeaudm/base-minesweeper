@@ -12,6 +12,13 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  *         Players wager ETH, flip tiles, and can cash out at any point.
  *         Mine placement is determined by Chainlink VRF v2.5 for provable fairness.
  *
+ * Safe-first-click guarantee
+ * ──────────────────────────
+ *   startGame()  → WAITING_FIRST_FLIP  (board shown, board empty)
+ *   firstFlip()  → WAITING_VRF         (VRF requested with chosen tile as seed exclusion)
+ *   VRF callback → ACTIVE              (mines placed, first tile auto-revealed as safe)
+ *   flipTile() / cashOut() as usual
+ *
  * Grid sizes (all 5 tiles wide, portrait orientation):
  *   0 → 5×4  = 20 tiles   Entry: 0.001 ETH
  *   1 → 5×7  = 35 tiles   Entry: 0.005 ETH
@@ -67,24 +74,26 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     // ─────────────────────────────────────────────
 
     enum GameStatus {
-        WAITING_VRF,  // VRF request in-flight, tiles not yet set
-        ACTIVE,       // mines placed, player can flip
-        CASHED_OUT,   // player cashed out
-        GAME_OVER,    // player hit a mine
-        CANCELLED     // VRF never returned (edge-case safety)
+        WAITING_FIRST_FLIP, // 0 – startGame done; player must click a tile to trigger VRF
+        WAITING_VRF,        // 1 – VRF request in-flight; mines not yet placed
+        ACTIVE,             // 2 – mines placed; player can flip tiles
+        CASHED_OUT,         // 3 – player cashed out
+        GAME_OVER,          // 4 – player hit a mine
+        CANCELLED           // 5 – VRF / first-flip never arrived (safety escape)
     }
 
     struct Game {
         address  player;
-        address  sessionKey;  // authorized to call flipTile / cashOut on player's behalf
+        address  sessionKey;      // authorized to call firstFlip / flipTile / cashOut on player's behalf
         uint8    gridSize;
         uint8    difficulty;
         uint256  entryFee;
-        uint256  maxPayout;      // reserved amount (entryFee × maxPayoutBPS / BPS_DENOM)
-        uint64   mineBitmask;    // bit i = 1 means tile i is a mine (set after VRF)
-        uint64   revealedBitmask;// bit i = 1 means tile i was revealed
-        uint8    safeRevealed;   // count of safe tiles revealed
-        uint8    totalSafe;      // totalTiles - mineCount
+        uint256  maxPayout;       // reserved amount (entryFee × maxPayoutBPS / BPS_DENOM)
+        uint8    safeTileIndex;   // tile chosen by the player on first click (guaranteed safe)
+        uint64   mineBitmask;     // bit i = 1 means tile i is a mine (set after VRF)
+        uint64   revealedBitmask; // bit i = 1 means tile i was revealed
+        uint8    safeRevealed;    // count of safe tiles revealed
+        uint8    totalSafe;       // totalTiles - mineCount
         GameStatus status;
         uint256  vrfRequestId;
         uint256  startedAt;
@@ -133,7 +142,11 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         uint8    gridSize,
         uint8    difficulty,
         uint256  entryFee,
-        uint256  maxPayout,
+        uint256  maxPayout
+    );
+    event FirstFlipMade(
+        uint256 indexed gameId,
+        uint8    tileIndex,
         uint256  vrfRequestId
     );
     event TileRevealed(
@@ -238,8 +251,10 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
 
     /**
      * @notice Start a new game. Player sends exactly the entry fee.
-     *         A session key can be authorised to flip tiles without wallet popups.
-     * @param gridSize  0 = 5×4, 1 = 5×7, 2 = 5×11
+     *         The board is shown immediately but mines are not yet placed.
+     *         The player must call firstFlip() to choose their opening tile
+     *         and trigger the VRF randomness request.
+     * @param gridSize   0 = 5×4, 1 = 5×7, 2 = 5×11
      * @param difficulty 0 = Easy, 1 = Normal, 2 = Hard
      * @param sessionKey Address authorised to flip tiles on player's behalf (0x0 = none)
      */
@@ -268,19 +283,19 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
 
         // Accounting
         feeBalance  += fee;
-        poolBalance -= poolRisk;          // reserve drawn from pool
-        poolBalance += netBet;            // netBet enters pool temporarily...
-        poolBalance -= netBet;            // ...but actually it moves to reserved
-        reservedBalance += maxPayout;     // full maxPayout locked
+        poolBalance -= poolRisk;
+        poolBalance += netBet;
+        poolBalance -= netBet;
+        reservedBalance += maxPayout;
 
         activeGameCount[gridSize]++;
 
-        // Determine mine count
+        // Determine mine count & safe tile count
         uint8 mineCount  = mineCounts[gridSize][difficulty];
         uint8 totalTiles = cfg.totalTiles;
         uint8 totalSafe  = totalTiles - mineCount;
 
-        // Create game record
+        // Create game record – mines not yet placed; VRF not yet requested
         gameId = nextGameId++;
         games[gameId] = Game({
             player:           msg.sender,
@@ -289,33 +304,18 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
             difficulty:       difficulty,
             entryFee:         cfg.entryFee,
             maxPayout:        maxPayout,
+            safeTileIndex:    0,
             mineBitmask:      0,
             revealedBitmask:  0,
             safeRevealed:     0,
             totalSafe:        totalSafe,
-            status:           GameStatus.WAITING_VRF,
+            status:           GameStatus.WAITING_FIRST_FLIP,
             vrfRequestId:     0,
             startedAt:        block.timestamp,
             endedAt:          0
         });
 
         playerActiveGame[msg.sender] = gameId;
-
-        // Request randomness via VRF v2.5
-        uint256 reqId = s_vrfCoordinator.requestRandomWords(
-            VRFV2PlusClient.RandomWordsRequest({
-                keyHash:             vrfKeyHash,
-                subId:               vrfSubscriptionId,
-                requestConfirmations: vrfRequestConfirmations,
-                callbackGasLimit:    vrfCallbackGasLimit,
-                numWords:            1,
-                extraArgs:           VRFV2PlusClient._argsToBytes(
-                                         VRFV2PlusClient.ExtraArgsV1({ nativePayment: false })
-                                     )
-            })
-        );
-        games[gameId].vrfRequestId = reqId;
-        vrfRequestToGame[reqId]    = gameId;
 
         emit GameStarted(
             gameId,
@@ -324,14 +324,55 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
             gridSize,
             difficulty,
             cfg.entryFee,
-            maxPayout,
-            reqId
+            maxPayout
         );
     }
 
     /**
+     * @notice Player (or session key) chooses their first tile.
+     *         This triggers the VRF randomness request and guarantees the
+     *         chosen tile will never be a mine.
+     *
+     *         After VRF fulfils the game transitions to ACTIVE and the chosen
+     *         tile is automatically revealed as safe (safeRevealed = 1).
+     *
+     * @param gameId    The game to play
+     * @param tileIndex The tile the player wants to reveal first (0-based)
+     */
+    function firstFlip(uint256 gameId, uint8 tileIndex)
+        external
+        nonReentrant
+        onlyPlayerOrSession(gameId)
+    {
+        Game storage g = games[gameId];
+        require(g.status == GameStatus.WAITING_FIRST_FLIP, "Not waiting for first flip");
+        require(tileIndex < gridConfigs[g.gridSize].totalTiles, "Tile out of range");
+
+        g.safeTileIndex = tileIndex;
+        g.status        = GameStatus.WAITING_VRF;
+
+        // Request randomness via VRF v2.5
+        uint256 reqId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash:              vrfKeyHash,
+                subId:                vrfSubscriptionId,
+                requestConfirmations: vrfRequestConfirmations,
+                callbackGasLimit:     vrfCallbackGasLimit,
+                numWords:             1,
+                extraArgs:            VRFV2PlusClient._argsToBytes(
+                                          VRFV2PlusClient.ExtraArgsV1({ nativePayment: false })
+                                      )
+            })
+        );
+        g.vrfRequestId     = reqId;
+        vrfRequestToGame[reqId] = gameId;
+
+        emit FirstFlipMade(gameId, tileIndex, reqId);
+    }
+
+    /**
      * @notice Reveal a tile. Callable by the player or their session key.
-     *         Reverts if VRF hasn't returned yet.
+     *         Reverts if VRF hasn't returned yet or game is not ACTIVE.
      * @param gameId     The game to play
      * @param tileIndex  0-based tile index (must be < totalTiles)
      */
@@ -407,7 +448,6 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         g.status  = status;
         g.endedAt = block.timestamp;
 
-        // Reveal the tile in bitmask even on game over
         g.revealedBitmask |= uint64(1) << mineTile;
 
         _releaseGame(gameId, g.gridSize, g.maxPayout, 0, g.player);
@@ -417,33 +457,26 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     }
 
     function _releaseGame(
-        uint256, // gameId - unused, kept for event logging clarity
+        uint256, // gameId – unused, kept for event logging clarity
         uint8   gridSize,
         uint256 maxPayout,
         uint256 payout,
         address player
     ) internal {
-        // Release reservation
         reservedBalance -= maxPayout;
-        poolBalance     += (maxPayout - payout); // unused portion returns to pool
+        poolBalance     += (maxPayout - payout);
 
         activeGameCount[gridSize]--;
         playerActiveGame[player] = 0;
 
-        // Pay player
         if (payout > 0) {
             (bool ok, ) = player.call{value: payout}("");
             require(ok, "ETH transfer failed");
         }
     }
 
-    /**
-     * @dev Linear payout: multiplier = (safeRevealed / totalSafe) × maxPayoutBPS
-     *      Returns the ETH amount to pay the player.
-     */
     function _calculatePayout(Game storage g) internal view returns (uint256) {
         if (g.safeRevealed == 0) return 0;
-        // payout = maxPayout × (safeRevealed / totalSafe)
         return (g.maxPayout * g.safeRevealed) / g.totalSafe;
     }
 
@@ -451,6 +484,11 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     // Chainlink VRF v2.5 Callback
     // ─────────────────────────────────────────────
 
+    /**
+     * @dev Called by the VRF coordinator after firstFlip() requests randomness.
+     *      Places mines on every tile except the player's chosen safe tile,
+     *      then auto-reveals that tile so the player starts with safeRevealed = 1.
+     */
     function fulfillRandomWords(
         uint256 requestId,
         uint256[] calldata randomWords
@@ -465,33 +503,52 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         uint8 totalTiles = gridConfigs[gridSize].totalTiles;
         uint8 mineCount  = mineCounts[gridSize][g.difficulty];
 
-        g.mineBitmask = _generateMines(randomWords[0], totalTiles, mineCount);
-        g.status      = GameStatus.ACTIVE;
+        // Place mines, guaranteeing the player's first tile is safe
+        g.mineBitmask = _generateMines(randomWords[0], totalTiles, mineCount, g.safeTileIndex);
+
+        // Auto-reveal the first (guaranteed safe) tile
+        g.revealedBitmask = uint64(1) << g.safeTileIndex;
+        g.safeRevealed    = 1;
+        g.status          = GameStatus.ACTIVE;
+
+        uint256 currentPayout = _calculatePayout(g);
+        // address(0) as caller signals this reveal was done by the VRF callback
+        emit TileRevealed(gameId, address(0), g.safeTileIndex, false, 1, currentPayout);
     }
 
     /**
-     * @dev Deterministic mine placement via partial Fisher-Yates shuffle.
-     *      Returns a bitmask where bit i = 1 means tile i is a mine.
-     *      totalTiles ≤ 55 so uint64 is sufficient.
+     * @dev Mine placement with safe-tile exclusion via partial Fisher-Yates shuffle.
+     *      Builds an index pool of all tiles except `safeTile`, then selects
+     *      `mineCount` positions from that pool.
+     *
+     * @param seed       Random seed from Chainlink VRF
+     * @param totalTiles Total number of tiles on this grid
+     * @param mineCount  Number of mines to place
+     * @param safeTile   Tile index that must NOT be a mine
      */
     function _generateMines(
         uint256 seed,
         uint8   totalTiles,
-        uint8   mineCount
+        uint8   mineCount,
+        uint8   safeTile
     ) internal pure returns (uint64 mineBitmask) {
-        // Build index array in-place using a small uint8 array
-        uint8[] memory tiles = new uint8[](totalTiles);
+        // Build array of every tile index except safeTile
+        uint8 available = totalTiles - 1;
+        uint8[] memory tiles = new uint8[](available);
+        uint8 idx = 0;
         for (uint8 i = 0; i < totalTiles; i++) {
-            tiles[i] = i;
+            if (i != safeTile) {
+                tiles[idx] = i;
+                idx++;
+            }
         }
 
-        // Partial Fisher-Yates: shuffle first mineCount positions
+        // Partial Fisher-Yates: select mineCount positions
         for (uint8 i = 0; i < mineCount; i++) {
-            uint8 remaining = totalTiles - i;
+            uint8 remaining = available - i;
             uint8 j = i + uint8(
                 uint256(keccak256(abi.encode(seed, i))) % remaining
             );
-            // swap tiles[i] and tiles[j]
             uint8 tmp = tiles[i];
             tiles[i]  = tiles[j];
             tiles[j]  = tmp;
@@ -507,16 +564,10 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     // View Helpers
     // ─────────────────────────────────────────────
 
-    /**
-     * @notice Get current payout for an active game.
-     */
     function getCurrentPayout(uint256 gameId) external view returns (uint256) {
         return _calculatePayout(games[gameId]);
     }
 
-    /**
-     * @notice Check whether a specific grid+difficulty combo is available.
-     */
     function isGridAvailable(uint8 gridSize, uint8 difficulty) external view returns (bool) {
         GridConfig storage cfg = gridConfigs[gridSize];
         if (!cfg.active) return false;
@@ -533,9 +584,6 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         return true;
     }
 
-    /**
-     * @notice Full game state for a given gameId.
-     */
     function getGame(uint256 gameId)
         external
         view
@@ -573,9 +621,6 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         );
     }
 
-    /**
-     * @notice Pool health summary.
-     */
     function getPoolHealth()
         external
         view
@@ -603,7 +648,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         uint256 entryFeeWei,
         uint16  maxPayoutBPS
     ) external onlyOwner {
-        require(maxPayoutBPS <= 20000, "Payout too high"); // cap at 2×
+        require(maxPayoutBPS <= 20000, "Payout too high");
         gridConfigs[gridSize].entryFee    = entryFeeWei;
         gridConfigs[gridSize].maxPayoutBPS = maxPayoutBPS;
     }
@@ -623,7 +668,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     }
 
     function setPlatformFee(uint16 feeBPS) external onlyOwner {
-        require(feeBPS <= 1000, "Fee too high"); // max 10%
+        require(feeBPS <= 1000, "Fee too high");
         platformFeeBPS = feeBPS;
     }
 
@@ -650,18 +695,12 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     // Admin — Pool & Fees
     // ─────────────────────────────────────────────
 
-    /**
-     * @notice Seed or top up the pool.
-     */
     function depositPool() external payable {
         require(msg.value > 0, "Zero deposit");
         poolBalance += msg.value;
         emit PoolDeposited(msg.sender, msg.value);
     }
 
-    /**
-     * @notice Withdraw accumulated platform fees.
-     */
     function withdrawFees() external onlyOwner nonReentrant {
         uint256 amount = feeBalance;
         require(amount > 0, "No fees");
@@ -671,10 +710,6 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         emit FeeWithdrawn(owner(), amount);
     }
 
-    /**
-     * @notice Withdraw pool profits above the safe reserve floor.
-     *         Safe floor = sum of (maxPayout × maxConcurrent) for all grids.
-     */
     function withdrawPoolProfits(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "Zero amount");
         uint256 safeFloor = _safeReserveFloor();
@@ -688,10 +723,6 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         emit ProfitWithdrawn(owner(), amount);
     }
 
-    /**
-     * @dev Compute the minimum pool balance required: sum over all grids of
-     *      maxPayout_hard × maxConcurrent  (worst-case exposure).
-     */
     function _safeReserveFloor() internal view returns (uint256 floor) {
         uint8[3] memory grids = [GRID_SMALL, GRID_MEDIUM, GRID_LARGE];
         for (uint256 i = 0; i < grids.length; i++) {
@@ -709,15 +740,13 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     // Session Key Management
     // ─────────────────────────────────────────────
 
-    /**
-     * @notice Update the session key for an active game (player only).
-     */
     function setSessionKey(uint256 gameId, address newSessionKey)
         external
     {
         Game storage g = games[gameId];
         require(msg.sender == g.player, "Not player");
         require(
+            g.status == GameStatus.WAITING_FIRST_FLIP ||
             g.status == GameStatus.WAITING_VRF ||
             g.status == GameStatus.ACTIVE,
             "Game ended"
@@ -731,19 +760,23 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     // ─────────────────────────────────────────────
 
     /**
-     * @notice Cancel a stuck game (VRF never returned after 24h).
-     *         Refunds the net bet to the player; fee is non-refundable.
+     * @notice Cancel a stuck game (player never made first flip, or VRF never
+     *         returned) after 24 h. Refunds the net bet; fee is non-refundable.
      */
     function cancelStuckGame(uint256 gameId) external nonReentrant {
         Game storage g = games[gameId];
-        require(g.status == GameStatus.WAITING_VRF, "Not waiting for VRF");
+        require(
+            g.status == GameStatus.WAITING_FIRST_FLIP ||
+            g.status == GameStatus.WAITING_VRF,
+            "Not cancellable"
+        );
         require(block.timestamp > g.startedAt + 24 hours, "Too early");
         require(msg.sender == g.player || msg.sender == owner(), "Not authorised");
 
         g.status  = GameStatus.CANCELLED;
         g.endedAt = block.timestamp;
 
-        uint256 refund = g.maxPayout; // return reserved amount
+        uint256 refund = g.maxPayout;
         reservedBalance -= refund;
         poolBalance     += refund;
 
@@ -752,7 +785,6 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         activeGameCount[g.gridSize]--;
         playerActiveGame[g.player] = 0;
 
-        // Refund net bet only (fee stays as platform revenue)
         if (netBet > 0 && poolBalance >= netBet) {
             poolBalance -= netBet;
             (bool ok, ) = g.player.call{value: netBet}("");

@@ -9,8 +9,16 @@ export const MINESWEEPER_ABI = [
       { indexed: false, name: "sessionKey", type: "address" },
       { indexed: false, name: "gridSize",   type: "uint8"   },
       { indexed: false, name: "difficulty", type: "uint8"   },
-      { indexed: false, name: "entryFee",     type: "uint256" },
-      { indexed: false, name: "maxPayout",    type: "uint256" },
+      { indexed: false, name: "entryFee",   type: "uint256" },
+      { indexed: false, name: "maxPayout",  type: "uint256" },
+    ],
+  },
+  {
+    type: "event",
+    name: "FirstFlipMade",
+    inputs: [
+      { indexed: true,  name: "gameId",       type: "uint256" },
+      { indexed: false, name: "tileIndex",    type: "uint8"   },
       { indexed: false, name: "vrfRequestId", type: "uint256" },
     ],
   },
@@ -82,6 +90,16 @@ export const MINESWEEPER_ABI = [
       { name: "sessionKey", type: "address" },
     ],
     outputs: [{ name: "gameId", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "firstFlip",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "gameId",    type: "uint256" },
+      { name: "tileIndex", type: "uint8"   },
+    ],
+    outputs: [],
   },
   {
     type: "function",

@@ -32,45 +32,47 @@ export type TileState =
   | "pending"; // flip in-flight
 
 export interface GameState {
-  gameId:         bigint | null;
-  status:         GameStatus;
-  gridSize:       number;
-  difficulty:     number;
-  entryFee:       bigint;
-  maxPayout:      bigint;
-  mineBitmask:    bigint;
-  revealedBitmask:bigint;
-  safeRevealed:   number;
-  totalSafe:      number;
-  tileStates:     TileState[];
-  multiplier:     number;
-  currentPayout:  bigint;
-  sessionKeyAddr: `0x${string}` | null;
-  isWaitingVRF:   boolean;
-  isActive:       boolean;
-  isCashedOut:    boolean;
-  isGameOver:     boolean;
+  gameId:              bigint | null;
+  status:              GameStatus;
+  gridSize:            number;
+  difficulty:          number;
+  entryFee:            bigint;
+  maxPayout:           bigint;
+  mineBitmask:         bigint;
+  revealedBitmask:     bigint;
+  safeRevealed:        number;
+  totalSafe:           number;
+  tileStates:          TileState[];
+  multiplier:          number;
+  currentPayout:       bigint;
+  sessionKeyAddr:      `0x${string}` | null;
+  isWaitingFirstFlip:  boolean; // board shown, waiting for player's first click
+  isWaitingVRF:        boolean; // first click made, VRF in-flight
+  isActive:            boolean;
+  isCashedOut:         boolean;
+  isGameOver:          boolean;
 }
 
 const EMPTY_STATE: GameState = {
-  gameId:          null,
-  status:          GameStatus.WAITING_VRF,
-  gridSize:        0,
-  difficulty:      1,
-  entryFee:        0n,
-  maxPayout:       0n,
-  mineBitmask:     0n,
-  revealedBitmask: 0n,
-  safeRevealed:    0,
-  totalSafe:       0,
-  tileStates:      [],
-  multiplier:      0,
-  currentPayout:   0n,
-  sessionKeyAddr:  null,
-  isWaitingVRF:    false,
-  isActive:        false,
-  isCashedOut:     false,
-  isGameOver:      false,
+  gameId:             null,
+  status:             GameStatus.WAITING_FIRST_FLIP,
+  gridSize:           0,
+  difficulty:         1,
+  entryFee:           0n,
+  maxPayout:          0n,
+  mineBitmask:        0n,
+  revealedBitmask:    0n,
+  safeRevealed:       0,
+  totalSafe:          0,
+  tileStates:         [],
+  multiplier:         0,
+  currentPayout:      0n,
+  sessionKeyAddr:     null,
+  isWaitingFirstFlip: false,
+  isWaitingVRF:       false,
+  isActive:           false,
+  isCashedOut:        false,
+  isGameOver:         false,
 };
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
@@ -140,7 +142,7 @@ export function useGame() {
     },
   });
 
-  const currentGameId = gameState.gameId ?? activeGameId ?? null;
+  const currentGameId = gameState.gameId ?? (activeGameId && activeGameId > 0n ? activeGameId : null);
 
   // ── Read full game state ─────────────────────────────────────────────────
   const { data: rawGame, refetch: refetchGame } = useReadContract({
@@ -153,6 +155,11 @@ export function useGame() {
       refetchInterval: 3_000,
     },
   });
+
+  // ── Clear pending tile when game goes ACTIVE (VRF resolved) ─────────────
+  useEffect(() => {
+    if (gameState.isActive) setPendingTile(null);
+  }, [gameState.isActive]);
 
   // ── Sync rawGame → gameState ─────────────────────────────────────────────
   useEffect(() => {
@@ -194,10 +201,11 @@ export function useGame() {
       sessionKeyAddr: sessionKey !== "0x0000000000000000000000000000000000000000"
         ? sessionKey as `0x${string}`
         : null,
-      isWaitingVRF: status === GameStatus.WAITING_VRF,
-      isActive:     status === GameStatus.ACTIVE,
-      isCashedOut:  status === GameStatus.CASHED_OUT,
-      isGameOver:   status === GameStatus.GAME_OVER,
+      isWaitingFirstFlip: status === GameStatus.WAITING_FIRST_FLIP,
+      isWaitingVRF:       status === GameStatus.WAITING_VRF,
+      isActive:           status === GameStatus.ACTIVE,
+      isCashedOut:        status === GameStatus.CASHED_OUT,
+      isGameOver:         status === GameStatus.GAME_OVER,
     });
   }, [rawGame, currentGameId, pendingTile]);
 
@@ -241,8 +249,9 @@ export function useGame() {
           setGameState(prev => ({
             ...prev,
             gameId,
-            status:      GameStatus.WAITING_VRF,
-            isWaitingVRF: true,
+            status:             GameStatus.WAITING_FIRST_FLIP,
+            isWaitingFirstFlip: true,
+            isWaitingVRF:       false,
           }));
           refetchGame();
           refetchActiveGame();
@@ -262,10 +271,19 @@ export function useGame() {
 
   // ─────────────────────────────────────────────────────────────────────────
   // Flip Tile  (signed by session key – zero wallet popups)
-  // Falls back to connected wallet if no relayer is configured.
+  //
+  // If the game is in WAITING_FIRST_FLIP, this is the player's first click:
+  //   → calls firstFlip() on the contract to trigger VRF
+  //   → the tile shows as "pending" while VRF resolves (~30-60 s)
+  //   → VRF callback auto-reveals the tile as safe and sets game ACTIVE
+  //
+  // If the game is ACTIVE, regular flipTile() is called.
+  // Falls back to connected wallet when no relayer is configured.
   // ─────────────────────────────────────────────────────────────────────────
   const flipTile = useCallback(async (tileIndex: number) => {
-    if (!gameState.gameId || !gameState.isActive) return;
+    if (!gameState.gameId) return;
+    const isFirstFlip = gameState.isWaitingFirstFlip;
+    if (!isFirstFlip && !gameState.isActive) return;
     if (gameState.tileStates[tileIndex] !== "unrevealed") return;
 
     setError(null);
@@ -273,23 +291,21 @@ export function useGame() {
 
     try {
       const sessionClient = createSessionWalletClient(SUPPORTED_CHAIN, RPC_URL);
+      const fnName = isFirstFlip ? "firstFlip" : "flipTile";
 
       if (sessionClient) {
-        // Gasless path: session key submits the tx directly
         const hash = await sessionClient.writeContract({
           address:      CONTRACT_ADDRESS,
           abi:          MINESWEEPER_ABI,
-          functionName: "flipTile",
+          functionName: fnName,
           args:         [gameState.gameId, tileIndex],
         });
-        // Wait for inclusion so refetch returns fresh state
         await publicClient?.waitForTransactionReceipt({ hash });
       } else {
-        // Fallback: wallet signs (relayer not configured or key missing)
         await writeContractAsync({
           address:      CONTRACT_ADDRESS,
           abi:          MINESWEEPER_ABI,
-          functionName: "flipTile",
+          functionName: fnName,
           args:         [gameState.gameId, tileIndex],
         });
       }
@@ -298,7 +314,10 @@ export function useGame() {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to flip tile");
     } finally {
-      setPendingTile(null);
+      // For regular flips clear immediately; for first flip the pending tile
+      // stays visible (showing as "pending") until VRF resolves and the
+      // useEffect above clears it once the game becomes ACTIVE.
+      if (!isFirstFlip) setPendingTile(null);
     }
   }, [gameState, writeContractAsync, publicClient, refetchGame]);
 

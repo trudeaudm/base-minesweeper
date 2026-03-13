@@ -19,7 +19,7 @@ function GameApp() {
 
   const hasActiveGame =
     gameState.gameId !== null &&
-    (gameState.isWaitingVRF || gameState.isActive);
+    (gameState.isWaitingFirstFlip || gameState.isWaitingVRF || gameState.isActive);
 
   const view: AppView = hasActiveGame ? "playing" : "select";
 
@@ -64,6 +64,7 @@ function GameApp() {
               status={gameState.status}
               onCashOut={cashOut}
               isCashingOut={isCashingOut}
+              isWaitingFirstFlip={gameState.isWaitingFirstFlip}
               isWaitingVRF={gameState.isWaitingVRF}
             />
 
@@ -74,7 +75,7 @@ function GameApp() {
               mineBitmask={gameState.mineBitmask}
               status={gameState.status}
               onFlip={flipTile}
-              isCashout={gameState.safeRevealed > 0}
+              isCashout={gameState.safeRevealed > 0 && gameState.isActive}
             />
 
             {/* Session key indicator */}

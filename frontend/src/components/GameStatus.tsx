@@ -1,18 +1,19 @@
 import { formatEth, GameStatus, GRID_INFO, DIFF_INFO } from "@/lib/config";
 
 interface GameStatusProps {
-  gridSize:      number;
-  difficulty:    number;
-  entryFee:      bigint;
-  maxPayout:     bigint;
-  currentPayout: bigint;
-  multiplier:    number;
-  safeRevealed:  number;
-  totalSafe:     number;
-  status:        GameStatus;
-  onCashOut:     () => void;
-  isCashingOut:  boolean;
-  isWaitingVRF:  boolean;
+  gridSize:           number;
+  difficulty:         number;
+  entryFee:           bigint;
+  maxPayout:          bigint;
+  currentPayout:      bigint;
+  multiplier:         number;
+  safeRevealed:       number;
+  totalSafe:          number;
+  status:             GameStatus;
+  onCashOut:          () => void;
+  isCashingOut:       boolean;
+  isWaitingFirstFlip: boolean;
+  isWaitingVRF:       boolean;
 }
 
 export function GameStatusBar({
@@ -27,6 +28,7 @@ export function GameStatusBar({
   status,
   onCashOut,
   isCashingOut,
+  isWaitingFirstFlip,
   isWaitingVRF,
 }: GameStatusProps) {
   const info       = GRID_INFO[gridSize as 0 | 1 | 2];
@@ -88,7 +90,17 @@ export function GameStatusBar({
         </div>
       </div>
 
-      {/* Waiting for VRF */}
+      {/* Prompt: click any tile to start */}
+      {isWaitingFirstFlip && (
+        <div className="text-center py-3">
+          <div className="inline-flex items-center gap-2 text-accent-green text-sm font-medium">
+            <div className="w-2 h-2 bg-accent-green rounded-full animate-pulse" />
+            Click any tile to begin — your first click is always safe!
+          </div>
+        </div>
+      )}
+
+      {/* Waiting for VRF after first click */}
       {isWaitingVRF && (
         <div className="text-center py-3">
           <div className="inline-flex items-center gap-2 text-base-blue text-sm">

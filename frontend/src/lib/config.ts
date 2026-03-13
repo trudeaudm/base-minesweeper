@@ -72,13 +72,14 @@ export const MINE_COUNTS = {
   [GRID_LARGE]:  { [DIFF_EASY]: 8, [DIFF_NORMAL]: 11,[DIFF_HARD]: 15 },
 } as const;
 
-// Game status enum (must match Solidity)
+// Game status enum — must match GameStatus in Minesweeper.sol exactly
 export enum GameStatus {
-  WAITING_VRF = 0,
-  ACTIVE      = 1,
-  CASHED_OUT  = 2,
-  GAME_OVER   = 3,
-  CANCELLED   = 4,
+  WAITING_FIRST_FLIP = 0, // startGame done; player clicks a tile to trigger VRF
+  WAITING_VRF        = 1, // VRF request in-flight; mines not yet placed
+  ACTIVE             = 2, // mines placed; player can flip tiles
+  CASHED_OUT         = 3,
+  GAME_OVER          = 4,
+  CANCELLED          = 5,
 }
 
 // Max payout BPS

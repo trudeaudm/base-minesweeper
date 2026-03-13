@@ -44,7 +44,9 @@ export function GameBoard({
   isCashout = false,
 }: GameBoardProps) {
   const info   = GRID_INFO[gridSize as 0 | 1 | 2];
-  const active = status === GameStatus.ACTIVE;
+  // Tiles are clickable in WAITING_FIRST_FLIP (player picks opening tile)
+  // and in ACTIVE (regular gameplay).
+  const active = status === GameStatus.ACTIVE || status === GameStatus.WAITING_FIRST_FLIP;
 
   return (
     <div
