@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAccount } from "wagmi";
 import { Header } from "@/components/Header";
 import { LandingHero } from "@/components/LandingHero";
@@ -13,15 +14,35 @@ import { GameStatus } from "@/lib/config";
 type AppView = "select" | "playing";
 
 function GameApp() {
-  const { gameState, isStarting, isCashingOut, error, startGame, flipTile, cashOut, resetGame } =
-    useGame();
+  const {
+    gameState,
+    isStarting,
+    isCashingOut,
+    isCancelling,
+    error,
+    vrfStartedAt,
+    startGame,
+    flipTile,
+    cashOut,
+    cancelGame,
+    resetGame,
+  } = useGame();
   const { pool } = usePoolHealth();
+
+  const [cancelledMessage, setCancelledMessage] = useState<string | null>(null);
 
   const hasActiveGame =
     gameState.gameId !== null &&
     (gameState.isWaitingFirstFlip || gameState.isWaitingVRF || gameState.isActive);
 
   const view: AppView = hasActiveGame ? "playing" : "select";
+
+  const handleCancelGame = async () => {
+    const success = await cancelGame();
+    if (success) {
+      setCancelledMessage("Game cancelled — your ETH has been refunded");
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-black">
@@ -37,12 +58,27 @@ function GameApp() {
 
         {view === "select" && (
           <div className="w-full max-w-sm animate-bounce-in">
+            {/* Cancelled-game success banner */}
+            {cancelledMessage && (
+              <div className="mb-4 px-4 py-3 bg-accent-green/10 border border-accent-green/40 rounded-lg flex items-start justify-between gap-2">
+                <p className="text-accent-green text-sm">{cancelledMessage}</p>
+                <button
+                  onClick={() => setCancelledMessage(null)}
+                  className="text-accent-green/60 hover:text-accent-green text-lg leading-none flex-shrink-0"
+                >
+                  ×
+                </button>
+              </div>
+            )}
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold text-white">New Game</h2>
               <p className="text-white/50 text-sm mt-1">Choose a grid and difficulty</p>
             </div>
             <GameSelect
-              onStart={startGame}
+              onStart={(g, d) => {
+                setCancelledMessage(null);
+                startGame(g, d);
+              }}
               isStarting={isStarting}
               poolBalance={pool}
             />
@@ -66,6 +102,9 @@ function GameApp() {
               isCashingOut={isCashingOut}
               isWaitingFirstFlip={gameState.isWaitingFirstFlip}
               isWaitingVRF={gameState.isWaitingVRF}
+              vrfStartedAt={vrfStartedAt}
+              onCancelGame={handleCancelGame}
+              isCancelling={isCancelling}
             />
 
             {/* Game grid */}

@@ -46,6 +46,7 @@ export interface GameState {
   multiplier:          number;
   currentPayout:       bigint;
   sessionKeyAddr:      `0x${string}` | null;
+  startedAt:           bigint; // Unix timestamp (seconds) when game was created
   isWaitingFirstFlip:  boolean; // board shown, waiting for player's first click
   isWaitingVRF:        boolean; // first click made, VRF in-flight
   isActive:            boolean;
@@ -68,6 +69,7 @@ const EMPTY_STATE: GameState = {
   multiplier:         0,
   currentPayout:      0n,
   sessionKeyAddr:     null,
+  startedAt:          0n,
   isWaitingFirstFlip: false,
   isWaitingVRF:       false,
   isActive:           false,
@@ -142,8 +144,12 @@ export function useGame() {
   const [pendingTile, setPendingTile] = useState<number | null>(null);
   const [isStarting, setIsStarting]   = useState(false);
   const [isCashingOut, setIsCashingOut] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError]             = useState<string | null>(null);
   const sessionAcc = useRef(getOrCreateSessionKey());
+  // Tracks the client-side timestamp (ms) when we first observed WAITING_VRF,
+  // so the UI can compute how long VRF has been in-flight.
+  const vrfEnteredAtRef = useRef<number | null>(null);
 
   // ── Read active game for player ──────────────────────────────────────────
   const { data: activeGameId, refetch: refetchActiveGame } = useReadContract({
@@ -183,10 +189,17 @@ export function useGame() {
     const [
       , sessionKey, gridSize, difficulty, entryFee,
       maxPayout, mineBitmask, revealedBitmask,
-      safeRevealed, totalSafe, statusNum, ,
+      safeRevealed, totalSafe, statusNum, startedAt,
     ] = rawGame;
 
     const status     = statusNum as GameStatus;
+
+    // Track when VRF started on the client side (for timeout UI)
+    if (status === GameStatus.WAITING_VRF) {
+      if (vrfEnteredAtRef.current === null) vrfEnteredAtRef.current = Date.now();
+    } else {
+      vrfEnteredAtRef.current = null;
+    }
     const totalTiles = GRID_INFO[gridSize as 0|1|2].totalTiles;
     const isHard     = difficulty === 2;
     const mult       = calcMultiplier(safeRevealed, totalSafe, isHard);
@@ -216,6 +229,7 @@ export function useGame() {
       sessionKeyAddr: sessionKey !== "0x0000000000000000000000000000000000000000"
         ? sessionKey as `0x${string}`
         : null,
+      startedAt,
       isWaitingFirstFlip: status === GameStatus.WAITING_FIRST_FLIP,
       isWaitingVRF:       status === GameStatus.WAITING_VRF,
       isActive:           status === GameStatus.ACTIVE,
@@ -403,11 +417,47 @@ export function useGame() {
     onLogs: () => { refetchGame(); refetchActiveGame(); },
   });
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Cancel Stuck Game  (requires connected wallet – only player or owner)
+  //
+  // The contract allows cancellation in WAITING_FIRST_FLIP or WAITING_VRF
+  // after 24 hours. This sends the tx via the player's connected wallet and
+  // clears local state on success.  Returns true on success, false on error.
+  // ─────────────────────────────────────────────────────────────────────────
+  const cancelGame = useCallback(async (): Promise<boolean> => {
+    if (!gameState.gameId) return false;
+    setError(null);
+    setIsCancelling(true);
+    try {
+      const hash = await writeContractAsync({
+        address:      CONTRACT_ADDRESS,
+        abi:          MINESWEEPER_ABI,
+        functionName: "cancelStuckGame",
+        args:         [gameState.gameId],
+      });
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash });
+      }
+      clearSessionKey();
+      vrfEnteredAtRef.current = null;
+      setGameState(EMPTY_STATE);
+      setError(null);
+      await refetchActiveGame();
+      return true;
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to cancel game");
+      return false;
+    } finally {
+      setIsCancelling(false);
+    }
+  }, [gameState.gameId, writeContractAsync, publicClient, refetchActiveGame]);
+
   // ── Reset (start over after win/loss) ────────────────────────────────────
   const resetGame = useCallback(() => {
     setGameState(EMPTY_STATE);
     setError(null);
     clearSessionKey();
+    vrfEnteredAtRef.current = null;
     refetchActiveGame();
   }, [refetchActiveGame]);
 
@@ -415,12 +465,15 @@ export function useGame() {
     gameState,
     isStarting,
     isCashingOut,
+    isCancelling,
     pendingTile,
     error,
     sessionKeyAddr: sessionAcc.current.address,
+    vrfStartedAt:  vrfEnteredAtRef.current,
     startGame,
     flipTile,
     cashOut,
+    cancelGame,
     resetGame,
     refetchGame,
   };
