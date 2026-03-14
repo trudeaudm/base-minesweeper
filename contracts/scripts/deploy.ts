@@ -37,12 +37,17 @@ async function main() {
   const address = await contract.getAddress();
   console.log("\n✓ Minesweeper deployed to:", address);
 
-  // ── Seed Pool ─────────────────────────────────────────────────
-  const SEED_AMOUNT = ethers.parseEther("0.1");
-  console.log("Seeding pool with", ethers.formatEther(SEED_AMOUNT), "ETH...");
-  const seedTx = await contract.depositPool({ value: SEED_AMOUNT });
-  await seedTx.wait();
-  console.log("✓ Pool seeded");
+  // ── Seed Pool (optional; set SEED_AMOUNT_ETH=0 to skip) ───────
+  const seedEth = process.env.SEED_AMOUNT_ETH ?? "0.1";
+  const SEED_AMOUNT = ethers.parseEther(seedEth);
+  if (SEED_AMOUNT > 0n) {
+    console.log("Seeding pool with", ethers.formatEther(SEED_AMOUNT), "ETH...");
+    const seedTx = await contract.depositPool({ value: SEED_AMOUNT });
+    await seedTx.wait();
+    console.log("✓ Pool seeded");
+  } else {
+    console.log("Skipping pool seed (SEED_AMOUNT_ETH=0). Seed later with: COMMAND=seed AMOUNT_ETH=<amount>");
+  }
 
   // ── Post-deployment Checklist ─────────────────────────────────
   console.log("\n────────────────────────────────────────────────");

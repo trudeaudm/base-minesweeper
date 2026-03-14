@@ -146,7 +146,7 @@ function GameApp() {
                 onClick={resetGame}
                 className="w-full py-3.5 rounded-[6px] font-bold text-base bg-base-blue text-white hover:bg-blue-500 active:scale-[0.98] transition-colors"
               >
-                Back to new game
+                New Game
               </button>
             )}
           </div>

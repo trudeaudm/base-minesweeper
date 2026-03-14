@@ -26,6 +26,11 @@ import {
   createSessionWalletClient,
 } from "@/lib/session";
 
+// Explicit gas limits for session-key txs (avoid "gas required exceeds allowance (0)" when estimation fails)
+const GAS_LIMIT_FIRST_FLIP = 600_000n;  // firstFlip requests VRF + state updates
+const GAS_LIMIT_FLIP_TILES = 400_000n;
+const GAS_LIMIT_CASH_OUT  = 200_000n;
+
 /** Returns a short user-facing message for wallet rejections; otherwise the original message. */
 function normalizeWalletError(e: unknown, action?: string): string {
   const msg = e instanceof Error ? e.message : String(e);
@@ -372,6 +377,7 @@ export function useGame() {
           abi:          MINESWEEPER_ABI,
           functionName: "flipTiles",
           args:         [g.gameId, tileIndices],
+          gas:          GAS_LIMIT_FLIP_TILES,
         });
         const receipt = await publicClient?.waitForTransactionReceipt({ hash });
         if (receipt?.logs) {
@@ -446,6 +452,7 @@ export function useGame() {
               abi:          MINESWEEPER_ABI,
               functionName: fnName,
               args:         [gameId, tileIndex],
+              gas:          GAS_LIMIT_FIRST_FLIP,
             });
             await publicClient?.waitForTransactionReceipt({ hash });
           } else {
@@ -507,6 +514,7 @@ export function useGame() {
           abi:          MINESWEEPER_ABI,
           functionName: "cashOut",
           args:         [gameState.gameId],
+          gas:          GAS_LIMIT_CASH_OUT,
         });
         await publicClient?.waitForTransactionReceipt({ hash });
       } else {
