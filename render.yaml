@@ -24,6 +24,9 @@ services:
         sync: false
       - key: VITE_CHAIN_ID
         value: "84532"
-      # Optional: override the public Base RPC used by session-key wallet clients
+      # Optional: Alchemy API key only — app builds Base Sepolia/Mainnet RPC URLs. Prefer over VITE_RPC_URL.
+      - key: VITE_ALCHEMY_API_KEY
+        sync: false
+      # Optional: full RPC URL override (if not using VITE_ALCHEMY_API_KEY)
       - key: VITE_RPC_URL
         sync: false

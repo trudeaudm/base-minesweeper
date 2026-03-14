@@ -9,10 +9,25 @@ export const CHAIN_ID = Number(import.meta.env.VITE_CHAIN_ID || "84532");
 export const SUPPORTED_CHAIN: Chain =
   CHAIN_ID === 8453 ? base : baseSepolia;
 
+const ALCHEMY_KEY = (import.meta.env.VITE_ALCHEMY_API_KEY as string | undefined)?.trim();
+const rawRpc = import.meta.env.VITE_RPC_URL as string | undefined;
+const fullRpc = rawRpc?.trim()
+  ? (/^https?:\/\//i.test(rawRpc.trim()) ? rawRpc.trim() : `https://${rawRpc.trim()}`)
+  : null;
+
+/** Resolved RPC URL for the given chain: Alchemy key → built URL, else full VITE_RPC_URL for active chain, else public. */
+export function getRpcUrlForChain(chainId: number): string {
+  if (ALCHEMY_KEY) {
+    return chainId === 8453
+      ? `https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`
+      : `https://base-sepolia.g.alchemy.com/v2/${ALCHEMY_KEY}`;
+  }
+  if (fullRpc && chainId === CHAIN_ID) return fullRpc;
+  return chainId === 8453 ? "https://mainnet.base.org" : "https://sepolia.base.org";
+}
+
 /** Public RPC used by session-key wallet clients (no wallet provider involved). */
-export const RPC_URL: string =
-  import.meta.env.VITE_RPC_URL ||
-  (CHAIN_ID === 8453 ? "https://mainnet.base.org" : "https://sepolia.base.org");
+export const RPC_URL: string = getRpcUrlForChain(CHAIN_ID);
 
 /** Session key gas budget (must match Minesweeper.SESSION_GAS_BUDGET). Sent with startGame and forwarded to session key. */
 export const SESSION_GAS_BUDGET = BigInt("100000000000000"); // 0.0001 ETH
