@@ -36,7 +36,7 @@ const GAS_LIMIT_CASH_OUT  = 200_000n;
 const SESSION_KEY_MIN_BALANCE = 50_000_000_000_000n; // 0.00005 ETH
 
 /** True if we have a session key with enough balance to pay for gas (so we can use it instead of wallet popup). */
-async function canUseSessionKey(publicClient: PublicClient | null): Promise<boolean> {
+async function canUseSessionKey(publicClient: PublicClient | null | undefined): Promise<boolean> {
   const account = getSessionKey();
   if (!account || !publicClient) return false;
   const balance = await publicClient.getBalance({ address: account.address });
