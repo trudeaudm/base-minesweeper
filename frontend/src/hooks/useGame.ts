@@ -675,6 +675,7 @@ export function useGame() {
     isCashingOut,
     isCancelling,
     pendingTile,
+    pendingTiles,
     isFlipInFlight,
     burstRevealOrder,
     onBurstRevealComplete,
