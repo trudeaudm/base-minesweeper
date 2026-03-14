@@ -229,11 +229,16 @@ export function useGame() {
       ? 0n
       : (maxPayout * BigInt(safeRevealed)) / BigInt(totalSafe);
 
+    const tiles = buildTileStates(totalTiles, revealedBitmask, mineBitmask);
+
     if (status !== GameStatus.GAME_OVER) {
       setMineHitTileIndex(null);
+    } else if (pendingTile !== null && tiles[pendingTile] === "mine") {
+      // Game just ended from this flip — start explosion sequence and hide overlay until it finishes
+      setMineHitTileIndex(pendingTile);
+      setExplosionComplete(false);
     }
 
-    const tiles = buildTileStates(totalTiles, revealedBitmask, mineBitmask);
     if (pendingTile !== null && tiles[pendingTile] === "unrevealed") {
       tiles[pendingTile] = "pending";
     }

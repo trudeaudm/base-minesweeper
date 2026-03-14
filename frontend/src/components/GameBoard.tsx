@@ -7,7 +7,7 @@ import { GameStatus, GRID_INFO } from "@/lib/config";
 // ─── Explosion sequence (easy to tweak) ─────────────────────────────────────
 const EXPLOSION_STAGGER_MS = 150;
 const EXPLOSION_DURATION_MS = 250;
-const EXPLOSION_SETTLE_MS = 600;
+const EXPLOSION_SETTLE_MS = 700;  // pause after last explosion before "you lose" overlay
 
 /** Shuffle array with a simple PRNG (seeded for stable sequence). */
 function shuffleWithSeed<T>(arr: T[], seed: number): T[] {
