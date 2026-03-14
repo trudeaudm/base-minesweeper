@@ -35,6 +35,7 @@ export default {
         "vrf-bar-spin":    "vrfBarSpin 0.4s linear infinite",
         "tile-explode":    "tileExplode 0.25s ease-out forwards",
         "screen-shake":    "screenShake 0.3s ease-out forwards",
+        "tile-shake":      "tileShake 0.35s ease-in-out",
       },
       keyframes: {
         vrfBarSpin: {
@@ -114,6 +115,13 @@ export default {
           "45%":       { transform: "translate(-3px, 1px)" },
           "60%":       { transform: "translate(3px, -1px)" },
           "75%":       { transform: "translate(-2px, 0)" },
+        },
+        // ── Subtle per-tile shake (random tiles during play)
+        tileShake: {
+          "0%, 100%":   { transform: "translate(0, 0)" },
+          "25%":       { transform: "translate(-1px, 0.5px)" },
+          "50%":       { transform: "translate(1px, -0.5px)" },
+          "75%":       { transform: "translate(-0.5px, 0)" },
         },
       },
       boxShadow: {

@@ -68,6 +68,9 @@ function adjacentMineCount(
 const VRF_BOUNCE_COUNT = 6;
 const VRF_BOUNCE_MS = 380;
 
+const TILE_SHAKE_INTERVAL_MS = 2600;
+const TILE_SHAKE_COUNT = 3;
+
 export type ExplosionPhase = "pending" | "exploding" | "exploded";
 
 export function GameBoard({
@@ -90,8 +93,11 @@ export function GameBoard({
   const [explodingTiles, setExplodingTiles] = useState<Set<number>>(new Set());
   const [explodedTiles, setExplodedTiles]   = useState<Set<number>>(new Set());
   const [screenShake, setScreenShake]       = useState(false);
+  const [shakingTiles, setShakingTiles]     = useState<Set<number>>(new Set());
   const explosionOrderRef = useRef<number[]>([]);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const tileStatesRef = useRef<TileState[]>(tileStates);
+  tileStatesRef.current = tileStates;
 
   useEffect(() => {
     if (status !== GameStatus.GAME_OVER || mineHitTileIndex == null || !onExplosionComplete) {
@@ -162,6 +168,27 @@ export function GameBoard({
     return "pending";
   };
 
+  // Random unrevealed tiles shake periodically during active play
+  useEffect(() => {
+    if (!active || isWaitingVRF || isGameOver) {
+      setShakingTiles(new Set());
+      return;
+    }
+    const pick = () => {
+      const states = tileStatesRef.current;
+      const unrevealed = states
+        .map((_, i) => i)
+        .filter((i) => states[i] === "unrevealed");
+      if (unrevealed.length === 0) return;
+      const count = Math.min(TILE_SHAKE_COUNT, unrevealed.length);
+      const shuffled = shuffleWithSeed([...unrevealed], Date.now());
+      setShakingTiles(new Set(shuffled.slice(0, count)));
+    };
+    pick();
+    const id = setInterval(pick, TILE_SHAKE_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [active, isWaitingVRF, isGameOver]);
+
   // Pseudo-random bounce sequence: 5–8 unrevealed tile indices, stable for this VRF wait.
   const bounceSequence = useMemo(() => {
     if (!isWaitingVRF) return [];
@@ -231,6 +258,7 @@ export function GameBoard({
             isGameOver={isGameOver && state === "unrevealed"}
             isWinReveal={isWinReveal && state === "unrevealed"}
             explosionPhase={getExplosionPhase(i)}
+            isShaking={shakingTiles.has(i)}
           />
         ))}
       </div>

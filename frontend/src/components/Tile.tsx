@@ -15,6 +15,7 @@ interface TileProps {
   isGameOver?:     boolean;  // fade unrevealed tiles to dark on loss
   isWinReveal?:    boolean;  // flip unrevealed tiles to white on win
   explosionPhase?: ExplosionPhase;  // mine explosion sequence: pending | exploding | exploded
+  isShaking?:      boolean;  // subtle shake (random tiles during play)
 }
 
 // Classic minesweeper number colors — tuned for light (white) tile background
@@ -43,6 +44,7 @@ export function Tile({
   isGameOver      = false,
   isWinReveal     = false,
   explosionPhase,
+  isShaking       = false,
 }: TileProps) {
   const handleClick = () => {
     if (!disabled && state === "unrevealed") {
@@ -197,7 +199,7 @@ export function Tile({
           ? `cursor-not-allowed bg-base-blue ${isWaitingVRF ? "" : "opacity-60"}`
           : "cursor-pointer bg-base-blue hover:bg-blue-500 active:scale-95 hover:shadow-cashout transition-colors duration-150"
         }
-        ${isCashout && !disabled && !isWaitingVRF ? "animate-pulse-slow" : ""}
+        ${isShaking ? "animate-tile-shake" : ""}
         ${isHighlighted ? "shadow-tile-glow ring-2 ring-base-blue/40" : ""}
       `}
       aria-label={`Tile ${index}`}

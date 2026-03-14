@@ -6,7 +6,6 @@ import { GameSelect } from "@/components/GameSelect";
 import { GameBoard } from "@/components/GameBoard";
 import { GameStatusBar } from "@/components/GameStatus";
 import { WinScreen } from "@/components/WinScreen";
-import { GameOverScreen } from "@/components/GameOverScreen";
 import { useGame } from "@/hooks/useGame";
 import { usePoolHealth } from "@/hooks/usePoolHealth";
 import { GameStatus } from "@/lib/config";
@@ -24,7 +23,6 @@ function GameApp() {
     blocksUntilCancel,
     canCancel,
     cancelThresholdBlocks,
-    explosionComplete,
     mineHitTileIndex,
     onExplosionComplete,
     startGame,
@@ -37,11 +35,8 @@ function GameApp() {
 
   const [cancelledMessage, setCancelledMessage] = useState<string | null>(null);
 
-  const hasActiveGame =
-    gameState.gameId !== null &&
-    (gameState.isWaitingFirstFlip || gameState.isWaitingVRF || gameState.isActive);
-
-  const view: AppView = hasActiveGame ? "playing" : "select";
+  const hasGame = gameState.gameId !== null;
+  const view: AppView = hasGame ? "playing" : "select";
 
   const handleCancelGame = async () => {
     const success = await cancelGame();
@@ -128,8 +123,8 @@ function GameApp() {
               onExplosionComplete={onExplosionComplete}
             />
 
-            {/* Session key indicator */}
-            {gameState.sessionKeyAddr && (
+            {/* Session key indicator — hide when game over */}
+            {gameState.sessionKeyAddr && !gameState.isGameOver && (
               <div className="px-3 py-2 bg-gray-100 rounded-[4px] flex items-center justify-between">
                 <span className="text-xs text-gray-500">Session key active</span>
                 <div className="flex items-center gap-1.5">
@@ -139,6 +134,17 @@ function GameApp() {
                   </span>
                 </div>
               </div>
+            )}
+
+            {/* Back to new game — when game is over */}
+            {gameState.isGameOver && (
+              <button
+                type="button"
+                onClick={resetGame}
+                className="w-full py-3.5 rounded-[6px] font-bold text-base bg-base-blue text-white hover:bg-blue-500 active:scale-[0.98] transition-colors"
+              >
+                Back to new game
+              </button>
             )}
           </div>
         )}
@@ -155,15 +161,6 @@ function GameApp() {
         />
       )}
 
-      {/* Game over overlay (after explosion sequence when applicable) */}
-      {gameState.isGameOver && explosionComplete && (
-        <GameOverScreen
-          entryFee={gameState.entryFee}
-          gridSize={gameState.gridSize}
-          difficulty={gameState.difficulty}
-          onPlayAgain={resetGame}
-        />
-      )}
     </div>
   );
 }
