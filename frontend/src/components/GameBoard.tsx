@@ -9,6 +9,8 @@ const EXPLOSION_STAGGER_MS = 150;
 const EXPLOSION_DURATION_MS = 250;
 const EXPLOSION_SETTLE_MS = 700;  // pause after last explosion before "you lose" overlay
 
+const BURST_STAGGER_MS = 80;  // delay between each tile burst reveal
+
 /** Shuffle array with a simple PRNG (seeded for stable sequence). */
 function shuffleWithSeed<T>(arr: T[], seed: number): T[] {
   const out = [...arr];
@@ -38,6 +40,8 @@ interface GameBoardProps {
   onFlip:             (index: number) => void;
   isCashout?:         boolean;
   isFlipPending?:     boolean;  // block further clicks until current flip tx confirms
+  burstRevealOrder?:  number[];  // tile indices in click order for burst reveal
+  onBurstRevealComplete?: () => void;
   mineHitTileIndex?:  number | null;
   onExplosionComplete?: () => void;
 }
@@ -82,6 +86,8 @@ export function GameBoard({
   onFlip,
   isCashout = false,
   isFlipPending = false,
+  burstRevealOrder = [],
+  onBurstRevealComplete,
   mineHitTileIndex = null,
   onExplosionComplete,
 }: GameBoardProps) {
@@ -96,10 +102,27 @@ export function GameBoard({
   const [explodedTiles, setExplodedTiles]   = useState<Set<number>>(new Set());
   const [screenShake, setScreenShake]       = useState(false);
   const [shakingTiles, setShakingTiles]     = useState<Set<number>>(new Set());
+  const [currentBurstIndex, setCurrentBurstIndex] = useState(0);
   const explosionOrderRef = useRef<number[]>([]);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const tileStatesRef = useRef<TileState[]>(tileStates);
   tileStatesRef.current = tileStates;
+
+  // Staggered burst reveal: advance currentBurstIndex every BURST_STAGGER_MS, then clear
+  useEffect(() => {
+    if (!burstRevealOrder.length || !onBurstRevealComplete) return;
+    setCurrentBurstIndex(0);
+    let i = 0;
+    const id = setInterval(() => {
+      i += 1;
+      setCurrentBurstIndex(i);
+      if (i >= burstRevealOrder.length) {
+        clearInterval(id);
+        onBurstRevealComplete();
+      }
+    }, BURST_STAGGER_MS);
+    return () => clearInterval(id);
+  }, [burstRevealOrder, onBurstRevealComplete]);
 
   useEffect(() => {
     if (status !== GameStatus.GAME_OVER || mineHitTileIndex == null || !onExplosionComplete) {
@@ -241,28 +264,33 @@ export function GameBoard({
         className="grid gap-1.5"
         style={{ gridTemplateColumns: `repeat(${info.cols}, 1fr)` }}
       >
-        {tileStates.map((state, i) => (
-          <Tile
-            key={i}
-            index={i}
-            cols={info.cols}
-            state={state}
-            adjacentCount={
-              state === "safe"
-                ? adjacentMineCount(i, info.cols, info.totalTiles, mineBitmask)
-                : undefined
-            }
-            onClick={onFlip}
-            disabled={!active || state !== "unrevealed" || isFlipPending}
-            isCashout={isCashout && active}
-            isWaitingVRF={isWaitingVRF && state === "unrevealed"}
-            isHighlighted={currentBounceTileIndex === i}
-            isGameOver={isGameOver && state === "unrevealed"}
-            isWinReveal={isWinReveal && state === "unrevealed"}
-            explosionPhase={getExplosionPhase(i)}
-            isShaking={shakingTiles.has(i)}
-          />
-        ))}
+        {tileStates.map((state, i) => {
+          const burstIdx = burstRevealOrder.indexOf(i);
+          return (
+            <Tile
+              key={i}
+              index={i}
+              cols={info.cols}
+              state={state}
+              adjacentCount={
+                state === "safe"
+                  ? adjacentMineCount(i, info.cols, info.totalTiles, mineBitmask)
+                  : undefined
+              }
+              onClick={onFlip}
+              disabled={!active || state !== "unrevealed" || isFlipPending}
+              isCashout={isCashout && active}
+              isWaitingVRF={isWaitingVRF && state === "unrevealed"}
+              isHighlighted={currentBounceTileIndex === i}
+              isGameOver={isGameOver && state === "unrevealed"}
+              isWinReveal={isWinReveal && state === "unrevealed"}
+              explosionPhase={getExplosionPhase(i)}
+              isShaking={shakingTiles.has(i)}
+              burstOrderIndex={burstIdx >= 0 ? burstIdx : null}
+              currentBurstIndex={currentBurstIndex}
+            />
+          );
+        })}
       </div>
 
       {/* VRF waiting: bouncing Base circle logo with spinning bar */}

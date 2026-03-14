@@ -25,6 +25,8 @@ function GameApp() {
     cancelThresholdBlocks,
     pendingTile,
     isFlipInFlight,
+    burstRevealOrder,
+    onBurstRevealComplete,
     mineHitTileIndex,
     onExplosionComplete,
     startGame,
@@ -122,6 +124,8 @@ function GameApp() {
               onFlip={flipTile}
               isCashout={gameState.safeRevealed > 0 && gameState.isActive}
               isFlipPending={pendingTile !== null || isFlipInFlight}
+              burstRevealOrder={burstRevealOrder}
+              onBurstRevealComplete={onBurstRevealComplete}
               mineHitTileIndex={mineHitTileIndex}
               onExplosionComplete={onExplosionComplete}
             />

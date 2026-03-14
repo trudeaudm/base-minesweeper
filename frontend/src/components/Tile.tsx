@@ -16,6 +16,8 @@ interface TileProps {
   isWinReveal?:    boolean;  // flip unrevealed tiles to white on win
   explosionPhase?: ExplosionPhase;  // mine explosion sequence: pending | exploding | exploded
   isShaking?:      boolean;  // subtle shake (random tiles during play)
+  burstOrderIndex?: number | null;  // index in burst reveal order (0-based), null if not in burst
+  currentBurstIndex?: number;       // current step in burst sequence
 }
 
 // Classic minesweeper number colors — tuned for light (white) tile background
@@ -45,7 +47,13 @@ export function Tile({
   isWinReveal     = false,
   explosionPhase,
   isShaking       = false,
+  burstOrderIndex = null,
+  currentBurstIndex = 0,
 }: TileProps) {
+  const inBurstList = burstOrderIndex !== null && burstOrderIndex !== undefined;
+  const showAsPending = state === "pending" || (inBurstList && currentBurstIndex < burstOrderIndex);
+  const showBurstReveal = inBurstList && currentBurstIndex === burstOrderIndex;
+  const showRevealedAfterBurst = inBurstList && currentBurstIndex > burstOrderIndex;
   const handleClick = () => {
     if (!disabled && state === "unrevealed") {
       onClick(index);
@@ -104,18 +112,33 @@ export function Tile({
     );
   }
 
-  // ── Mine (single reveal, no explosion sequence) ───────────────────────────
+  // ── Pending look: shake + grow to 1.1 (clicked, waiting for tx or waiting in burst queue)
+  if (showAsPending) {
+    return (
+      <div
+        className="
+          relative flex items-center justify-center
+          rounded-[3px] w-full aspect-square
+          bg-base-blue border border-blue-400/25 shadow-tile
+          animate-tile-pending cursor-wait
+        "
+        aria-hidden
+      />
+    );
+  }
+
+  // ── Mine (single reveal, or burst reveal in order)
   if (state === "mine") {
     return (
       <div style={{ perspective: "600px" }}>
         <div
-          className="
+          className={`
             relative flex items-center justify-center
             rounded-[3px] w-full aspect-square
-            bg-mine shadow-tile-mine
-            animate-mine-reveal cursor-default
+            bg-mine shadow-tile-mine cursor-default
             border border-red-300/30
-          "
+            ${showBurstReveal ? "animate-tile-burst" : "animate-mine-reveal"}
+          `}
         >
           <BaseMineIcon size={24} />
         </div>
@@ -123,19 +146,19 @@ export function Tile({
     );
   }
 
-  // ── Safe (revealed) ──────────────────────────────────────────────────────
+  // ── Safe (revealed, or burst reveal in order)
   if (state === "safe") {
     const n = adjacentCount ?? 0;
     return (
       <div style={{ perspective: "600px" }}>
         <div
-          className="
+          className={`
             relative flex items-center justify-center
             rounded-[3px] w-full aspect-square
             bg-neutral-100 border border-neutral-300/60
             shadow-tile-safe cursor-default
-            animate-tile-flip
-          "
+            ${showBurstReveal ? "animate-tile-burst" : "animate-tile-flip"}
+          `}
         >
           {n > 0 && (
             <span className={`text-xs font-bold font-mono select-none ${NUMBER_COLORS[n]}`}>
@@ -143,22 +166,6 @@ export function Tile({
             </span>
           )}
         </div>
-      </div>
-    );
-  }
-
-  // ── Pending (first-flip in flight) ───────────────────────────────────────
-  if (state === "pending") {
-    return (
-      <div
-        className="
-          relative flex items-center justify-center
-          rounded-[3px] w-full aspect-square
-          bg-blue-700/60 border border-base-blue/50
-          cursor-wait
-        "
-      >
-        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }

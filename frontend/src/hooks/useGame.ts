@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { flushSync } from "react-dom";
 import {
   useReadContract,
   useWriteContract,
@@ -197,11 +198,14 @@ export function useGame() {
   const sessionAcc = useRef(getOrCreateSessionKey());
   const batchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingTilesRef = useRef<number[]>([]);
+  const lastFlipClickOrderRef = useRef<number[]>([]);
   const gameStateRef = useRef(gameState);
   gameStateRef.current = gameState;
   pendingTilesRef.current = pendingTiles;
 
-  const FLIP_BATCH_DELAY_MS = 100;
+  const [burstRevealOrder, setBurstRevealOrder] = useState<number[]>([]);
+
+  const FLIP_BATCH_DELAY_MS = 50;
 
   // ── Current block number (for block-based cancel countdown) ───────────────
   const { data: currentBlock = 0n } = useBlockNumber({ watch: true });
@@ -275,6 +279,14 @@ export function useGame() {
     }
     for (const i of pendingTiles) {
       if (i < tiles.length && tiles[i] === "unrevealed") tiles[i] = "pending";
+    }
+
+    if (lastFlipClickOrderRef.current.length > 0) {
+      const order = lastFlipClickOrderRef.current.filter(
+        (i) => i < totalTiles && (revealedBitmask & (1n << BigInt(i))) !== 0n
+      );
+      if (order.length > 0) setBurstRevealOrder(order);
+      lastFlipClickOrderRef.current = [];
     }
 
     setGameState({
@@ -377,13 +389,14 @@ export function useGame() {
     const g = gameStateRef.current;
     if (!g.gameId || !g.isActive) return;
 
+    lastFlipClickOrderRef.current = [...current];
     const tileIndices = [...new Set(current)].sort((a, b) => a - b) as readonly number[];
     setPendingTiles([]);
-    setIsFlipInFlight(true);
     setError(null);
     try {
       const useSession = await canUseSessionKey(publicClient);
       const sessionClient = useSession ? createSessionWalletClient(SUPPORTED_CHAIN, RPC_URL) : null;
+      setIsFlipInFlight(true);
       if (sessionClient) {
         const hash = await sessionClient.writeContract({
           address:      CONTRACT_ADDRESS,
@@ -454,7 +467,7 @@ export function useGame() {
     setError(null);
 
     if (isFirstFlip) {
-      setPendingTile(tileIndex);
+      flushSync(() => setPendingTile(tileIndex));
       (async () => {
         try {
           const fnName = "firstFlip";
@@ -619,6 +632,8 @@ export function useGame() {
     setGameState(EMPTY_STATE);
     setMineHitTileIndex(null);
     setExplosionComplete(true);
+    setBurstRevealOrder([]);
+    lastFlipClickOrderRef.current = [];
     setError(null);
     clearSessionKey();
     refetchActiveGame();
@@ -646,6 +661,10 @@ export function useGame() {
     setExplosionComplete(true);
   }, []);
 
+  const onBurstRevealComplete = useCallback(() => {
+    setBurstRevealOrder([]);
+  }, []);
+
   return {
     gameState,
     isStarting,
@@ -653,6 +672,8 @@ export function useGame() {
     isCancelling,
     pendingTile,
     isFlipInFlight,
+    burstRevealOrder,
+    onBurstRevealComplete,
     error,
     explosionComplete,
     mineHitTileIndex,

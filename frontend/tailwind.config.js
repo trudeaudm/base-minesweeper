@@ -36,6 +36,8 @@ export default {
         "tile-explode":    "tileExplode 0.25s ease-out forwards",
         "screen-shake":    "screenShake 0.3s ease-out forwards",
         "tile-shake":      "tileShake 0.35s ease-in-out",
+        "tile-pending":    "tilePending 0.6s ease-in-out infinite",
+        "tile-burst":      "tileBurst 0.25s ease-out forwards",
       },
       keyframes: {
         vrfBarSpin: {
@@ -122,6 +124,18 @@ export default {
           "25%":       { transform: "translate(-1px, 0.5px)" },
           "50%":       { transform: "translate(1px, -0.5px)" },
           "75%":       { transform: "translate(-0.5px, 0)" },
+        },
+        // ── Pending (waiting for tx): shake + grow to 1.1
+        tilePending: {
+          "0%, 100%":   { transform: "translate(0, 0) scale(1.02)" },
+          "25%":        { transform: "translate(-2px, 1px) scale(1.06)" },
+          "50%":        { transform: "translate(2px, -1px) scale(1.1)" },
+          "75%":        { transform: "translate(-1px, 0) scale(1.06)" },
+        },
+        // ── Burst reveal: settle from 1.1 to 1 when result comes back
+        tileBurst: {
+          "0%":   { transform: "scale(1.1)" },
+          "100%": { transform: "scale(1)" },
         },
       },
       boxShadow: {
