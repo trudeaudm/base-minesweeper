@@ -13,15 +13,16 @@ const BASE_MAINNET_PUBLIC = "https://mainnet.base.org";
 const customSepolia = getRpcUrlForChain(84532);
 const customMainnet = getRpcUrlForChain(8453);
 
-// Use custom RPC when not the public default; add public as fallback so invalid/rate-limited RPCs retry.
+// Use public RPC first so background traffic (block subscription, ranking pings) doesn't hit Alchemy.
+// Alchemy often returns 400 for some methods or with invalid keys; public RPC is stable and free.
 const sepoliaTransport =
   customSepolia !== BASE_SEPOLIA_PUBLIC
-    ? fallback([http(customSepolia), http(BASE_SEPOLIA_PUBLIC)])
+    ? fallback([http(BASE_SEPOLIA_PUBLIC), http(customSepolia)])
     : http(BASE_SEPOLIA_PUBLIC);
 
 const mainnetTransport =
   customMainnet !== BASE_MAINNET_PUBLIC
-    ? fallback([http(customMainnet), http(BASE_MAINNET_PUBLIC)])
+    ? fallback([http(BASE_MAINNET_PUBLIC), http(customMainnet)])
     : http(BASE_MAINNET_PUBLIC);
 
 export const wagmiConfig = getDefaultConfig({
