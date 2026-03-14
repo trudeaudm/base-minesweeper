@@ -7,9 +7,8 @@
  * – no wallet interaction required.
  *
  * Gas funding:
- *   After startGame confirms, the frontend calls POST /fund on the relayer
- *   service which sends a small amount of ETH to the session key address.
- *   On Base L2 this covers hundreds of flips for ~$0.25 per game.
+ *   The player sends entry fee + SESSION_GAS_BUDGET in startGame(); the
+ *   contract forwards the gas budget to the session key (self-funded flips/cashout).
  *
  * Helpers exported:
  *   getOrCreateSessionKey()      – generate/load the ephemeral Account

@@ -20,7 +20,13 @@ const ENTRY_SMALL  = ethers.parseEther("0.001");
 const ENTRY_MEDIUM = ethers.parseEther("0.005");
 const ENTRY_LARGE  = ethers.parseEther("0.01");
 
+const SESSION_GAS_BUDGET = ethers.parseEther("0.0005");
+
 const POOL_SEED = ethers.parseEther("10");
+
+function startGameValue(entryFee: bigint) {
+  return entryFee + SESSION_GAS_BUDGET;
+}
 
 enum GameStatus {
   WAITING_FIRST_FLIP, // 0
@@ -81,10 +87,10 @@ async function startAndFulfil(
 ): Promise<bigint> {
   const entryFees = [ENTRY_SMALL, ENTRY_MEDIUM, ENTRY_LARGE];
 
-  // 1. Start game (WAITING_FIRST_FLIP)
+  // 1. Start game (WAITING_FIRST_FLIP) — msg.value = entry + gas budget
   const startTx = await minesweeper.connect(player).startGame(
     gridSize, difficulty, sessionKey,
-    { value: entryFees[gridSize] }
+    { value: startGameValue(entryFees[gridSize]) }
   );
   const startReceipt = await startTx.wait();
 
@@ -193,7 +199,7 @@ describe("Minesweeper", () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await expect(
         minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-          value: ENTRY_SMALL,
+          value: startGameValue(ENTRY_SMALL),
         })
       ).to.emit(minesweeper, "GameStarted");
 
@@ -206,7 +212,7 @@ describe("Minesweeper", () => {
     it("deducts platform fee to feeBalance", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       const { fees } = await minesweeper.getPoolHealth();
       expect(fees).to.equal(ENTRY_SMALL * 5n / 100n);
@@ -216,7 +222,7 @@ describe("Minesweeper", () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       const { reserved: before } = await minesweeper.getPoolHealth();
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       const { reserved: after } = await minesweeper.getPoolHealth();
       const expectedReserve = ENTRY_SMALL * 170n / 100n; // DIFF_NORMAL 1.7×
@@ -227,19 +233,19 @@ describe("Minesweeper", () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await expect(
         minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-          value: ENTRY_SMALL - 1n,
+          value: startGameValue(ENTRY_SMALL) - 1n,
         })
-      ).to.be.revertedWith("Wrong entry fee");
+      ).to.be.revertedWith("Insufficient value: entry fee + gas budget");
     });
 
     it("rejects concurrent game from same player", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       await expect(
         minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-          value: ENTRY_SMALL,
+          value: startGameValue(ENTRY_SMALL),
         })
       ).to.be.revertedWith("Active game exists");
     });
@@ -266,7 +272,7 @@ describe("Minesweeper", () => {
       const [, player] = await ethers.getSigners();
       await expect(
         ms2.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-          value: ENTRY_SMALL,
+          value: startGameValue(ENTRY_SMALL),
         })
       ).to.be.revertedWith("Insufficient pool");
     });
@@ -274,7 +280,7 @@ describe("Minesweeper", () => {
     it("stores session key", async () => {
       const { minesweeper, player, sessionKey } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, sessionKey.address, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       const g = await minesweeper.getGame(1n);
       expect(g.sessionKey).to.equal(sessionKey.address);
@@ -283,7 +289,7 @@ describe("Minesweeper", () => {
     it("hard difficulty reserves 1.9× entry", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_HARD, ethers.ZeroAddress, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       const { reserved } = await minesweeper.getPoolHealth();
       const expected = ENTRY_SMALL * 190n / 100n;
@@ -296,7 +302,7 @@ describe("Minesweeper", () => {
     it("transitions game from WAITING_FIRST_FLIP to WAITING_VRF", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       const gameId = 1n;
       await minesweeper.connect(player).firstFlip(gameId, 5);
@@ -307,7 +313,7 @@ describe("Minesweeper", () => {
     it("emits FirstFlipMade with correct tileIndex and vrfRequestId", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       await expect(
         minesweeper.connect(player).firstFlip(1n, 7)
@@ -319,7 +325,7 @@ describe("Minesweeper", () => {
     it("session key can call firstFlip", async () => {
       const { minesweeper, player, sessionKey } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, sessionKey.address, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       await expect(
         minesweeper.connect(sessionKey).firstFlip(1n, 3)
@@ -329,7 +335,7 @@ describe("Minesweeper", () => {
     it("unauthorised caller cannot call firstFlip", async () => {
       const { minesweeper, player, player2 } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       await expect(
         minesweeper.connect(player2).firstFlip(1n, 0)
@@ -348,7 +354,7 @@ describe("Minesweeper", () => {
     it("rejects firstFlip twice on same game", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       await minesweeper.connect(player).firstFlip(1n, 0);
       // Now in WAITING_VRF – cannot call again
@@ -360,7 +366,7 @@ describe("Minesweeper", () => {
     it("rejects firstFlip with out-of-range tile", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       await expect(
         minesweeper.connect(player).firstFlip(1n, 20) // SMALL only has 0–19
@@ -401,7 +407,7 @@ describe("Minesweeper", () => {
     it("VRF callback emits TileRevealed for the auto-revealed first tile", async () => {
       const { minesweeper, vrfMock, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       const gameId = 1n;
       const ffTx      = await minesweeper.connect(player).firstFlip(gameId, 4);
@@ -425,7 +431,7 @@ describe("Minesweeper", () => {
     it("cannot call flipTile while in WAITING_FIRST_FLIP state", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       await expect(
         minesweeper.connect(player).flipTile(1n, 0)
@@ -463,7 +469,7 @@ describe("Minesweeper", () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       // Get to WAITING_VRF by calling startGame + firstFlip but NOT fulfilling VRF
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       await minesweeper.connect(player).firstFlip(1n, 0);
       await expect(
@@ -815,7 +821,7 @@ describe("Minesweeper", () => {
     it("can cancel after 100 blocks if player never made first flip", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       await mine(101);
 
@@ -831,7 +837,7 @@ describe("Minesweeper", () => {
     it("can cancel after 43200 blocks if VRF never returned", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       await minesweeper.connect(player).firstFlip(1n, 0);
       await mine(43201);
@@ -847,7 +853,7 @@ describe("Minesweeper", () => {
     it("rejects cancel before block threshold", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
-        value: ENTRY_SMALL,
+        value: startGameValue(ENTRY_SMALL),
       });
       const gameId = await minesweeper.playerActiveGame(player.address);
       await expect(

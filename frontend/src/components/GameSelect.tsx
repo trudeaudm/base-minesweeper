@@ -64,7 +64,7 @@ function GridOption({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-[#111111] font-mono font-semibold">{info.entryLabel}</div>
+          <div className="text-[#111111] font-mono font-semibold">{info.entryLabel} + 0.0005 ETH gas</div>
           <div className="text-gray-500 text-xs font-mono">max {maxMulti}</div>
         </div>
       </div>
@@ -189,7 +189,7 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
         ) : !available ? (
           "Grid Unavailable"
         ) : (
-          `Play for ${GRID_INFO[selectedGrid as 0|1|2].entryLabel}`
+          `Play — ${GRID_INFO[selectedGrid as 0|1|2].entryLabel} + 0.0005 ETH gas budget`
         )}
       </button>
 

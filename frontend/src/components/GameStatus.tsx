@@ -66,6 +66,7 @@ export function GameStatusBar({
         </span>
         <span className="font-mono">
           Entry: <span className="text-[#111111]">{formatEth(entryFee, 4)} ETH</span>
+          <span className="text-gray-500"> + 0.0005 ETH gas</span>
         </span>
       </div>
 

@@ -24,36 +24,6 @@ services:
         sync: false
       - key: VITE_CHAIN_ID
         value: "84532"
-      # URL of the relayer service deployed below
-      - key: VITE_RELAYER_URL
-        sync: false
       # Optional: override the public Base RPC used by session-key wallet clients
       - key: VITE_RPC_URL
-        sync: false
-
-  # ── Gas relayer ────────────────────────────────────────────────────────────
-  # Funds ephemeral session keys so tile flips require no wallet popup.
-  # Keep the relayer wallet topped up with a small amount of ETH on Base.
-  - type: web
-    name: minesweeper-relayer
-    runtime: node
-    buildCommand: cd relayer && npm install && npm run build
-    startCommand: cd relayer && npm start
-    envVars:
-      - key: PORT
-        value: "3001"
-      - key: CHAIN_ID
-        value: "84532"
-      - key: RPC_URL
-        value: "https://sepolia.base.org"
-      # Funded EOA private key (0x…) – pays gas for session-key funding txns
-      - key: RELAYER_PRIVATE_KEY
-        sync: false
-      - key: CONTRACT_ADDRESS
-        sync: false
-      # ETH sent to each new session key (0.0001 ETH covers hundreds of flips on Base)
-      - key: FUND_AMOUNT_ETH
-        value: "0.0001"
-      # Set to your Render frontend URL after first deploy, e.g. https://base-minesweeper.onrender.com
-      - key: FRONTEND_ORIGINS
         sync: false

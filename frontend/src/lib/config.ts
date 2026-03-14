@@ -14,13 +14,8 @@ export const RPC_URL: string =
   import.meta.env.VITE_RPC_URL ||
   (CHAIN_ID === 8453 ? "https://mainnet.base.org" : "https://sepolia.base.org");
 
-/**
- * URL of the gas relayer service (POST /fund).
- * When set, tile flips and cashouts are submitted by the ephemeral session key
- * (no wallet popup). When unset the app falls back to the connected wallet.
- */
-export const RELAYER_URL: string | null =
-  import.meta.env.VITE_RELAYER_URL || null;
+/** Session key gas budget (must match Minesweeper.SESSION_GAS_BUDGET). Sent with startGame and forwarded to session key. */
+export const SESSION_GAS_BUDGET = BigInt("500000000000000"); // 0.0005 ETH
 
 // Grid sizes
 export const GRID_SMALL  = 0;

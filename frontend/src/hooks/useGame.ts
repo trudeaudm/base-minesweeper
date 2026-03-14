@@ -13,7 +13,7 @@ import {
   CONTRACT_ADDRESS,
   SUPPORTED_CHAIN,
   RPC_URL,
-  RELAYER_URL,
+  SESSION_GAS_BUDGET,
   GameStatus,
   GRID_INFO,
   calcMultiplier,
@@ -95,48 +95,6 @@ function buildTileStates(
     const isMine = ((mineBitmask >> BigInt(i)) & 1n) === 1n;
     return isMine ? "mine" : "safe";
   });
-}
-
-/**
- * Ask the relayer to fund the session key for this game, then wait for the
- * funding transaction to be confirmed on-chain before returning.
- *
- * Must complete before the first flip is allowed: the session key needs ETH
- * to pay for the firstFlip gas, not just for subsequent flipTile calls.
- *
- * Non-throwing: on any failure we log and return so the caller can still
- * proceed (worst-case the player gets a wallet popup instead).
- */
-async function requestRelayerFunding(
-  gameId: bigint,
-  sessionKeyAddress: `0x${string}`,
-  publicClient: ReturnType<typeof usePublicClient> | undefined,
-): Promise<void> {
-  if (!RELAYER_URL) return;
-  try {
-    const res = await fetch(`${RELAYER_URL}/fund`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({
-        gameId:            gameId.toString(),
-        sessionKeyAddress,
-      }),
-    });
-    if (!res.ok) {
-      console.warn("[relayer] fund failed:", await res.text());
-      return;
-    }
-    const data = await res.json() as { ok: boolean; hash?: `0x${string}`; alreadyFunded?: boolean };
-    // Wait for the ETH transfer to land so the session key has gas before
-    // firstFlip is submitted.  Base Sepolia finalises in ~2 s so this adds
-    // negligible delay to the loading spinner.
-    if (data.hash && publicClient) {
-      await publicClient.waitForTransactionReceipt({ hash: data.hash, timeout: 30_000 });
-    }
-  } catch (err) {
-    // Non-fatal: worst case the player gets a wallet popup for flips
-    console.warn("[relayer] fund request error:", err);
-  }
 }
 
 // ─── Main Hook ────────────────────────────────────────────────────────────────
@@ -257,14 +215,15 @@ export function useGame() {
       const sk = sessionAcc.current.address;
 
       const entryFee = GRID_INFO[gridSize as 0|1|2].entryFee;
+      const value = entryFee + SESSION_GAS_BUDGET;
 
-      // Single wallet signature: pays entry fee, registers session key on-chain
+      // Single wallet popup: pays entry fee + gas budget, registers session key; contract forwards gas to session key
       const hash = await writeContractAsync({
         address:      CONTRACT_ADDRESS,
         abi:          MINESWEEPER_ABI,
         functionName: "startGame",
         args:         [gridSize, difficulty, sk],
-        value:        entryFee,
+        value,
       });
 
       if (publicClient) {
@@ -273,11 +232,6 @@ export function useGame() {
         const started = logs.find(l => l.eventName === "GameStarted");
         if (started) {
           const gameId = (started.args as { gameId: bigint }).gameId;
-          // Fund the session key BEFORE showing the clickable board.
-          // firstFlip itself needs gas – the session key must have ETH before
-          // the player can click, not just before VRF resolves.
-          await requestRelayerFunding(gameId, sk, publicClient ?? undefined);
-
           setGameState(prev => ({
             ...prev,
             gameId,
@@ -305,7 +259,7 @@ export function useGame() {
   //   → VRF callback auto-reveals the tile as safe and sets game ACTIVE
   //
   // If the game is ACTIVE, regular flipTile() is called.
-  // Falls back to connected wallet when no relayer is configured.
+  // Falls back to connected wallet if session key client unavailable.
   // ─────────────────────────────────────────────────────────────────────────
   const flipTile = useCallback(async (tileIndex: number) => {
     if (!gameState.gameId) return;
