@@ -11,6 +11,7 @@ import {
   DIFF_NORMAL,
   DIFF_HARD,
   formatEth,
+  getMaxPayoutWei,
 } from "@/lib/config";
 
 interface GameSelectProps {
@@ -27,16 +28,19 @@ function GridOption({
   difficulty,
   selected,
   onSelect,
+  available,
+  maxPayoutLabel,
 }: {
-  gridSize:   number;
-  difficulty: number;
-  selected:   boolean;
-  onSelect:   () => void;
+  gridSize:       number;
+  difficulty:     number;
+  selected:       boolean;
+  onSelect:       () => void;
+  available:      boolean;
+  maxPayoutLabel: string;
 }) {
-  const available = useGridAvailable(gridSize, difficulty);
-  const info      = GRID_INFO[gridSize as 0 | 1 | 2];
-  const mines     = MINE_COUNTS[gridSize as 0|1|2][difficulty as 0|1|2];
-  const maxMulti  = difficulty === 2 ? "1.95×" : "1.90×";
+  const info   = GRID_INFO[gridSize as 0 | 1 | 2];
+  const mines  = MINE_COUNTS[gridSize as 0|1|2][difficulty as 0|1|2];
+  const maxMulti = difficulty === 2 ? "1.95×" : "1.90×";
 
   return (
     <button
@@ -65,7 +69,9 @@ function GridOption({
         </div>
       </div>
       {!available && (
-        <div className="mt-2 text-xs text-gray-500 italic">Temporarily Unavailable</div>
+        <div className="mt-2 text-xs text-gray-500">
+          Pool insufficient · needs {maxPayoutLabel} ETH to activate
+        </div>
       )}
       {selected && available && (
         <div className="absolute top-2 right-2 w-2 h-2 bg-base-blue rounded-full" />
@@ -78,7 +84,25 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
   const [selectedGrid, setSelectedGrid] = useState<number>(GRID_SMALL);
   const [selectedDiff, setSelectedDiff] = useState<number>(DIFF_NORMAL);
 
+  const availableSmall  = useGridAvailable(GRID_SMALL, selectedDiff);
+  const availableMedium = useGridAvailable(GRID_MEDIUM, selectedDiff);
+  const availableLarge  = useGridAvailable(GRID_LARGE, selectedDiff);
+
   const available = useGridAvailable(selectedGrid, selectedDiff);
+
+  const poolStatus =
+    !availableSmall && !availableMedium && !availableLarge
+      ? "none"
+      : availableSmall && availableMedium && availableLarge
+      ? "all"
+      : "some";
+
+  const poolDotClass =
+    poolStatus === "none"
+      ? "bg-mine"
+      : poolStatus === "some"
+      ? "bg-yellow-500"
+      : "bg-accent-green animate-pulse";
 
   return (
     <div className="w-full max-w-sm mx-auto space-y-6">
@@ -86,7 +110,7 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
       <div className="flex items-center justify-between px-1">
         <span className="text-xs text-gray-500 uppercase tracking-widest">Pool balance</span>
         <div className="flex items-center gap-1.5">
-          <div className={`w-2 h-2 rounded-full ${poolBalance > 0n ? "bg-accent-green animate-pulse" : "bg-mine"}`} />
+          <div className={`w-2 h-2 rounded-full ${poolDotClass}`} />
           <span className="font-mono text-sm text-gray-700">
             {formatEth(poolBalance, 4)} ETH
           </span>
@@ -104,9 +128,16 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
               difficulty={selectedDiff}
               selected={selectedGrid === g}
               onSelect={() => setSelectedGrid(g)}
+              available={g === GRID_SMALL ? availableSmall : g === GRID_MEDIUM ? availableMedium : availableLarge}
+              maxPayoutLabel={formatEth(getMaxPayoutWei(g, selectedDiff), 4)}
             />
           ))}
         </div>
+        {poolStatus === "none" && (
+          <p className="mt-3 text-sm text-gray-600 text-center">
+            The prize pool is currently being refilled. Check back soon!
+          </p>
+        )}
       </div>
 
       {/* Difficulty selection */}

@@ -87,6 +87,13 @@ export const MAX_PAYOUT_BPS_NORMAL = 19000n; // 1.90×
 export const MAX_PAYOUT_BPS_HARD   = 19500n; // 1.95×
 export const BPS_DENOMINATOR       = 10000n;
 
+/** Max payout in wei for a grid + difficulty (matches contract logic for isGridAvailable). */
+export function getMaxPayoutWei(gridSize: number, difficulty: number): bigint {
+  const cfg = GRID_INFO[gridSize as 0 | 1 | 2];
+  const bps = difficulty === DIFF_HARD ? MAX_PAYOUT_BPS_HARD : MAX_PAYOUT_BPS_NORMAL;
+  return (cfg.entryFee * bps) / BPS_DENOMINATOR;
+}
+
 // Block-based cancellation thresholds (must match Minesweeper.sol)
 export const CANCEL_BLOCKS_WAITING_FIRST_FLIP = 100;   // ~3.3 min on Base
 export const CANCEL_BLOCKS_WAITING_VRF        = 43200; // ~24h on Base
