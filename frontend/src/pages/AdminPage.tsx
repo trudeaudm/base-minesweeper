@@ -35,7 +35,11 @@ interface StuckGame {
 export function AdminPage() {
   const { address: connectedAddress, isConnected } = useAccount();
   const publicClient = usePublicClient();
-  const { data: currentBlock = 0n } = useBlockNumber({ watch: true });
+  // Poll block number instead of watch (avoids "filter not found" on Alchemy/HTTP RPCs)
+  const { data: currentBlock = 0n } = useBlockNumber({
+    watch: false,
+    query: { refetchInterval: 12_000 },
+  });
 
   const { data: ownerAddress } = useReadContract({
     address: CONTRACT_ADDRESS,

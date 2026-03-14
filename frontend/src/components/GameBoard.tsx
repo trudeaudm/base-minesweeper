@@ -39,7 +39,7 @@ interface GameBoardProps {
   status:             GameStatus;
   onFlip:             (index: number) => void;
   isCashout?:         boolean;
-  isFlipPending?:     boolean;  // block further clicks until current flip tx confirms
+  isFlipPending?:     boolean;  // true only when a flip tx is in flight (not during 50ms batch collection)
   burstRevealOrder?:  number[];  // tile indices in click order for burst reveal
   onBurstRevealComplete?: () => void;
   mineHitTileIndex?:  number | null;

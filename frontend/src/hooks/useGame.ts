@@ -208,7 +208,11 @@ export function useGame() {
   const FLIP_BATCH_DELAY_MS = 50;
 
   // ── Current block number (for block-based cancel countdown) ───────────────
-  const { data: currentBlock = 0n } = useBlockNumber({ watch: true });
+  // Poll block number instead of watch (avoids "filter not found" on Alchemy/HTTP RPCs)
+  const { data: currentBlock = 0n } = useBlockNumber({
+    watch: false,
+    query: { refetchInterval: 12_000 },
+  });
 
   // ── Read active game for player ──────────────────────────────────────────
   const { data: activeGameId, refetch: refetchActiveGame } = useReadContract({
@@ -393,10 +397,10 @@ export function useGame() {
     const tileIndices = [...new Set(current)].sort((a, b) => a - b) as readonly number[];
     setPendingTiles([]);
     setError(null);
+    setIsFlipInFlight(true); // Grey out only when batch fires, not during the 50ms collection window
     try {
       const useSession = await canUseSessionKey(publicClient);
       const sessionClient = useSession ? createSessionWalletClient(SUPPORTED_CHAIN, RPC_URL) : null;
-      setIsFlipInFlight(true);
       if (sessionClient) {
         const hash = await sessionClient.writeContract({
           address:      CONTRACT_ADDRESS,
