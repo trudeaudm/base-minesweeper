@@ -25,11 +25,23 @@ import {
   clearSessionKey,
   createSessionWalletClient,
 } from "@/lib/session";
+import type { PublicClient } from "viem";
 
 // Explicit gas limits for session-key txs (avoid "gas required exceeds allowance (0)" when estimation fails)
 const GAS_LIMIT_FIRST_FLIP = 600_000n;  // firstFlip requests VRF + state updates
 const GAS_LIMIT_FLIP_TILES = 400_000n;
 const GAS_LIMIT_CASH_OUT  = 200_000n;
+
+/** Min session-key balance to use it; otherwise fall back to connected wallet (avoids "allowance (0)" when key has no ETH). */
+const SESSION_KEY_MIN_BALANCE = 50_000_000_000_000n; // 0.00005 ETH
+
+/** True if we have a session key with enough balance to pay for gas (so we can use it instead of wallet popup). */
+async function canUseSessionKey(publicClient: PublicClient | null): Promise<boolean> {
+  const account = getSessionKey();
+  if (!account || !publicClient) return false;
+  const balance = await publicClient.getBalance({ address: account.address });
+  return balance >= SESSION_KEY_MIN_BALANCE;
+}
 
 /** Returns a short user-facing message for wallet rejections; otherwise the original message. */
 function normalizeWalletError(e: unknown, action?: string): string {
@@ -370,7 +382,8 @@ export function useGame() {
     setIsFlipInFlight(true);
     setError(null);
     try {
-      const sessionClient = createSessionWalletClient(SUPPORTED_CHAIN, RPC_URL);
+      const useSession = await canUseSessionKey(publicClient);
+      const sessionClient = useSession ? createSessionWalletClient(SUPPORTED_CHAIN, RPC_URL) : null;
       if (sessionClient) {
         const hash = await sessionClient.writeContract({
           address:      CONTRACT_ADDRESS,
@@ -444,8 +457,9 @@ export function useGame() {
       setPendingTile(tileIndex);
       (async () => {
         try {
-          const sessionClient = createSessionWalletClient(SUPPORTED_CHAIN, RPC_URL);
           const fnName = "firstFlip";
+          const useSession = await canUseSessionKey(publicClient);
+          const sessionClient = useSession ? createSessionWalletClient(SUPPORTED_CHAIN, RPC_URL) : null;
           if (sessionClient) {
             const hash = await sessionClient.writeContract({
               address:      CONTRACT_ADDRESS,
@@ -506,7 +520,8 @@ export function useGame() {
     setIsCashingOut(true);
 
     try {
-      const sessionClient = createSessionWalletClient(SUPPORTED_CHAIN, RPC_URL);
+      const useSession = await canUseSessionKey(publicClient);
+      const sessionClient = useSession ? createSessionWalletClient(SUPPORTED_CHAIN, RPC_URL) : null;
 
       if (sessionClient) {
         const hash = await sessionClient.writeContract({
