@@ -1,6 +1,7 @@
 import { ethers } from "hardhat";
 
-const CONTRACT = "0xE2e2823454e331795E044CE4D81C49B51c3805Be";
+const CONTRACT =
+  process.env.CONTRACT_ADDRESS ?? "0xE2e2823454e331795E044CE4D81C49B51c3805Be";
 const SEED_AMOUNT = ethers.parseEther("0.05");
 
 async function main() {
