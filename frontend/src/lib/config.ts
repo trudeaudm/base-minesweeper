@@ -9,24 +9,21 @@ export const CHAIN_ID = Number(import.meta.env.VITE_CHAIN_ID || "84532");
 export const SUPPORTED_CHAIN: Chain =
   CHAIN_ID === 8453 ? base : baseSepolia;
 
-const ALCHEMY_KEY = (import.meta.env.VITE_ALCHEMY_API_KEY as string | undefined)?.trim();
 const rawRpc = import.meta.env.VITE_RPC_URL as string | undefined;
 const fullRpc = rawRpc?.trim()
   ? (/^https?:\/\//i.test(rawRpc.trim()) ? rawRpc.trim() : `https://${rawRpc.trim()}`)
   : null;
 
-/** Resolved RPC URL for the given chain: Alchemy key → built URL, else full VITE_RPC_URL for active chain, else public. */
+const BASE_SEPOLIA_PUBLIC = "https://sepolia.base.org";
+const BASE_MAINNET_PUBLIC = "https://mainnet.base.org";
+
+/** RPC URL for the given chain: VITE_RPC_URL for active chain if set, else public. Avoid Alchemy to prevent 429. */
 export function getRpcUrlForChain(chainId: number): string {
-  if (ALCHEMY_KEY) {
-    return chainId === 8453
-      ? `https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`
-      : `https://base-sepolia.g.alchemy.com/v2/${ALCHEMY_KEY}`;
-  }
   if (fullRpc && chainId === CHAIN_ID) return fullRpc;
-  return chainId === 8453 ? "https://mainnet.base.org" : "https://sepolia.base.org";
+  return chainId === 8453 ? BASE_MAINNET_PUBLIC : BASE_SEPOLIA_PUBLIC;
 }
 
-/** Public RPC used by session-key wallet clients (no wallet provider involved). */
+/** RPC URL used by session-key wallet and other app traffic (public or VITE_RPC_URL). */
 export const RPC_URL: string = getRpcUrlForChain(CHAIN_ID);
 
 /** Session key gas budget (must match Minesweeper.SESSION_GAS_BUDGET). Sent with startGame and forwarded to session key. */
@@ -106,9 +103,8 @@ export function getMaxPayoutWei(gridSize: number, difficulty: number): bigint {
   return (cfg.entryFee * bps) / BPS_DENOMINATOR;
 }
 
-// Block-based cancellation thresholds (must match Minesweeper.sol)
+// Block-based cancellation: only before first flip (must match Minesweeper.sol)
 export const CANCEL_BLOCKS_WAITING_FIRST_FLIP = 100;   // ~3.3 min on Base
-export const CANCEL_BLOCKS_WAITING_VRF        = 43200; // ~24h on Base
 
 /** Calculate payout multiplier for display (0 → 0, full → 1.5× / 1.7× / 1.9× by difficulty). */
 export function calcMultiplier(

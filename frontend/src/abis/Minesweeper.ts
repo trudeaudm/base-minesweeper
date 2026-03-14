@@ -114,6 +114,16 @@ export const MINESWEEPER_ABI = [
   },
   {
     type: "function",
+    name: "flipTiles",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "gameId",      type: "uint256" },
+      { name: "tileIndices", type: "uint8[]" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
     name: "cashOut",
     stateMutability: "nonpayable",
     inputs: [{ name: "gameId", type: "uint256" }],

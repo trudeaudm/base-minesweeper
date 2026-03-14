@@ -23,6 +23,8 @@ function GameApp() {
     blocksUntilCancel,
     canCancel,
     cancelThresholdBlocks,
+    pendingTile,
+    isFlipInFlight,
     mineHitTileIndex,
     onExplosionComplete,
     startGame,
@@ -119,6 +121,7 @@ function GameApp() {
               status={gameState.status}
               onFlip={flipTile}
               isCashout={gameState.safeRevealed > 0 && gameState.isActive}
+              isFlipPending={pendingTile !== null || isFlipInFlight}
               mineHitTileIndex={mineHitTileIndex}
               onExplosionComplete={onExplosionComplete}
             />

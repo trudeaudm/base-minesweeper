@@ -22,9 +22,8 @@ dotenv.config();
 const CONTRACT_ADDRESS = (process.env.CONTRACT_ADDRESS || "").trim() || undefined;
 const COMMAND = (process.env.COMMAND || "").trim().toLowerCase();
 
-// Block-based cancellation thresholds (must match Minesweeper.sol)
+// Block-based cancellation: only before first flip (must match Minesweeper.sol)
 const CANCEL_BLOCKS_WAITING_FIRST_FLIP = 100;
-const CANCEL_BLOCKS_WAITING_VRF = 43200;
 
 enum GameStatus {
   WAITING_FIRST_FLIP = 0,
@@ -44,10 +43,7 @@ const STATUS_LABEL: Record<number, string> = {
   [GameStatus.CANCELLED]: "CANCELLED",
 };
 
-const CANCELLABLE_STATUSES = new Set([
-  GameStatus.WAITING_FIRST_FLIP,
-  GameStatus.WAITING_VRF,
-]);
+const CANCELLABLE_STATUSES = new Set([GameStatus.WAITING_FIRST_FLIP]);
 
 async function getContractAndOwner() {
   const address = CONTRACT_ADDRESS;
@@ -234,9 +230,7 @@ async function main() {
       const status = Number(g.status);
       if (!CANCELLABLE_STATUSES.has(status)) continue;
       const startBlock = typeof g.startBlock === "bigint" ? g.startBlock : BigInt(g.startBlock.toString());
-      const requiredBlocks = status === GameStatus.WAITING_FIRST_FLIP
-        ? CANCEL_BLOCKS_WAITING_FIRST_FLIP
-        : CANCEL_BLOCKS_WAITING_VRF;
+      const requiredBlocks = CANCEL_BLOCKS_WAITING_FIRST_FLIP;
       const canCancel = currentBlock > Number(startBlock) + requiredBlocks;
       if (canCancel) {
         cancellable.push({

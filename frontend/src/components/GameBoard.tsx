@@ -37,6 +37,7 @@ interface GameBoardProps {
   status:             GameStatus;
   onFlip:             (index: number) => void;
   isCashout?:         boolean;
+  isFlipPending?:     boolean;  // block further clicks until current flip tx confirms
   mineHitTileIndex?:  number | null;
   onExplosionComplete?: () => void;
 }
@@ -80,6 +81,7 @@ export function GameBoard({
   status,
   onFlip,
   isCashout = false,
+  isFlipPending = false,
   mineHitTileIndex = null,
   onExplosionComplete,
 }: GameBoardProps) {
@@ -251,7 +253,7 @@ export function GameBoard({
                 : undefined
             }
             onClick={onFlip}
-            disabled={!active || state !== "unrevealed"}
+            disabled={!active || state !== "unrevealed" || isFlipPending}
             isCashout={isCashout && active}
             isWaitingVRF={isWaitingVRF && state === "unrevealed"}
             isHighlighted={currentBounceTileIndex === i}

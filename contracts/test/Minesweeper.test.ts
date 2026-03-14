@@ -834,7 +834,7 @@ describe("Minesweeper", () => {
       expect(g.status).to.equal(GameStatus.CANCELLED);
     });
 
-    it("can cancel after 43200 blocks if VRF never returned", async () => {
+    it("rejects cancel when game is WAITING_VRF (after first flip)", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
         value: startGameValue(ENTRY_SMALL),
@@ -847,7 +847,7 @@ describe("Minesweeper", () => {
       expect(g.status).to.equal(GameStatus.WAITING_VRF);
       await expect(
         minesweeper.connect(player).cancelStuckGame(gameId)
-      ).to.not.be.reverted;
+      ).to.be.revertedWith("Not cancellable");
     });
 
     it("rejects cancel before block threshold", async () => {

@@ -14,8 +14,8 @@ interface GameStatusProps {
   isCashingOut:       boolean;
   isWaitingFirstFlip: boolean;
   isWaitingVRF:       boolean;
-  // Block-based cancel: WAITING_FIRST_FLIP after 100 blocks, WAITING_VRF after 43200
-  cancelBlockDataReady: boolean;  // true once startBlock is loaded from chain (avoids button flash)
+  // Block-based cancel: only before first flip (100 blocks)
+  cancelBlockDataReady: boolean;
   blocksUntilCancel:   number;
   canCancel:           boolean;
   cancelThresholdBlocks: number;
@@ -48,7 +48,7 @@ export function GameStatusBar({
   const diffInfo   = DIFF_INFO[difficulty as 0 | 1 | 2];
   const isActive   = status === GameStatus.ACTIVE;
   const canCashout = isActive && safeRevealed > 0;
-  const showCancelUI = (isWaitingFirstFlip || isWaitingVRF) && cancelBlockDataReady;
+  const showCancelUI = isWaitingFirstFlip && cancelBlockDataReady;
 
   const progressPct = totalSafe > 0 ? (safeRevealed / totalSafe) * 100 : 0;
   const multiplierColor =
@@ -128,44 +128,34 @@ export function GameStatusBar({
         </div>
       )}
 
-      {/* Block-based cancel: show countdown or button for WAITING_FIRST_FLIP / WAITING_VRF */}
+      {/* Cancel only before first flip: 100-block countdown or button */}
       {showCancelUI && (
         <div className="space-y-2">
           {blocksUntilCancel > 0 ? (
             <p className="text-xs text-gray-500 text-center">
               Cancel available in <span className="font-mono text-gray-700">{blocksUntilCancel}</span> blocks
-              {cancelThresholdBlocks === 43200 && " (~24h on Base)"}
             </p>
           ) : canCancel ? (
-            <>
-              {isWaitingVRF && (
-                <div className="px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-[4px]">
-                  <p className="text-xs text-yellow-700 text-center">
-                    VRF is taking longer than expected. You can cancel and refund your ETH.
-                  </p>
-                </div>
+            <button
+              onClick={onCancelGame}
+              disabled={isCancelling}
+              className={`
+                w-full py-3 rounded-[6px] font-bold text-sm transition-all duration-200
+                ${!isCancelling
+                  ? "bg-yellow-600 hover:bg-yellow-500 text-white active:scale-95"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                }
+              `}
+            >
+              {isCancelling ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-base-blue border-t-transparent rounded-full animate-spin" />
+                  Cancelling…
+                </span>
+              ) : (
+                "Cancel Game & Refund"
               )}
-              <button
-                onClick={onCancelGame}
-                disabled={isCancelling}
-                className={`
-                  w-full py-3 rounded-[6px] font-bold text-sm transition-all duration-200
-                  ${!isCancelling
-                    ? "bg-yellow-600 hover:bg-yellow-500 text-white active:scale-95"
-                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  }
-                `}
-              >
-                {isCancelling ? (
-                  <span className="inline-flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-base-blue border-t-transparent rounded-full animate-spin" />
-                    Cancelling…
-                  </span>
-                ) : (
-                  "Cancel Game & Refund"
-                )}
-              </button>
-            </>
+            </button>
           ) : null}
         </div>
       )}

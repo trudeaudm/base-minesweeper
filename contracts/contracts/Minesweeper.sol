@@ -52,9 +52,8 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     uint16 public constant MAX_PAYOUT_BPS_HARD   = 19000; // 1.9×
     uint16 public constant BPS_DENOMINATOR        = 10000;
 
-    // Block-based cancellation thresholds (~3.3 min and ~24h on Base at 2s/block)
+    // Block-based cancellation: only before first flip (~3.3 min on Base at 2s/block)
     uint256 public constant CANCEL_BLOCKS_WAITING_FIRST_FLIP = 100;
-    uint256 public constant CANCEL_BLOCKS_WAITING_VRF        = 43200;
 
     // Session key gas budget: forwarded to sessionKey in startGame (self-funded flips/cashout)
     uint256 public constant SESSION_GAS_BUDGET = 0.0001 ether;
@@ -433,6 +432,54 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     }
 
     /**
+     * @notice Reveal multiple tiles in one call. Stops on first mine or when all safe tiles revealed.
+     *         Skips already-revealed tiles. Callable by player or session key.
+     * @param gameId     The game to play
+     * @param tileIndices 0-based tile indices (duplicates and already-revealed are skipped)
+     */
+    function flipTiles(uint256 gameId, uint8[] calldata tileIndices)
+        external
+        nonReentrant
+        onlyPlayerOrSession(gameId)
+    {
+        Game storage g = games[gameId];
+        require(g.status == GameStatus.ACTIVE, "Game not active");
+        uint8 totalTiles = gridConfigs[g.gridSize].totalTiles;
+
+        for (uint256 i = 0; i < tileIndices.length; i++) {
+            uint8 tileIndex = tileIndices[i];
+            if (tileIndex >= totalTiles) continue;
+            if ((g.revealedBitmask >> tileIndex) & 1 == 1) continue;
+
+            bool isMine = (g.mineBitmask >> tileIndex) & 1 == 1;
+
+            if (isMine) {
+                _endGame(gameId, tileIndex, GameStatus.GAME_OVER);
+                return;
+            }
+
+            g.revealedBitmask |= uint64(1) << tileIndex;
+            g.safeRevealed++;
+
+            uint256 currentPayout = _calculatePayout(g);
+
+            emit TileRevealed(
+                gameId,
+                msg.sender,
+                tileIndex,
+                false,
+                g.safeRevealed,
+                currentPayout
+            );
+
+            if (g.safeRevealed == g.totalSafe) {
+                _cashOut(gameId, g.player);
+                return;
+            }
+        }
+    }
+
+    /**
      * @notice Cash out current winnings. Callable by player or session key.
      * @param gameId The active game to cash out
      */
@@ -773,23 +820,14 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     // ─────────────────────────────────────────────
 
     /**
-     * @notice Cancel a stuck game (player never made first flip, or VRF never
-     *         returned) after block-based thresholds. Refunds the net bet; fee is non-refundable.
-     *         WAITING_FIRST_FLIP: cancellable after 100 blocks (~3.3 min on Base).
-     *         WAITING_VRF: cancellable after 43200 blocks (~24h on Base).
+     * @notice Cancel a stuck game only if player never made first flip, after 100 blocks.
+     *         Refunds the net bet; fee is non-refundable. Once the first flip is done, the game cannot be cancelled.
      */
     function cancelStuckGame(uint256 gameId) external nonReentrant {
         Game storage g = games[gameId];
+        require(g.status == GameStatus.WAITING_FIRST_FLIP, "Not cancellable");
         require(
-            g.status == GameStatus.WAITING_FIRST_FLIP ||
-            g.status == GameStatus.WAITING_VRF,
-            "Not cancellable"
-        );
-        uint256 requiredBlocks = g.status == GameStatus.WAITING_FIRST_FLIP
-            ? CANCEL_BLOCKS_WAITING_FIRST_FLIP
-            : CANCEL_BLOCKS_WAITING_VRF;
-        require(
-            block.number > g.startBlock + requiredBlocks,
+            block.number > g.startBlock + CANCEL_BLOCKS_WAITING_FIRST_FLIP,
             "Cancel available after block threshold"
         );
         require(msg.sender == g.player || msg.sender == owner(), "Not authorised");

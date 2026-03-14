@@ -49,3 +49,34 @@ export function useGridAvailable(gridSize: number, difficulty: number) {
   });
   return data ?? false;
 }
+
+/** Min pool balance required per grid (from contract gridConfigs). Used for tooltip. */
+export function useMinPoolThresholds(): Record<number, bigint> {
+  const small  = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi:     MINESWEEPER_ABI,
+    functionName: "gridConfigs",
+    args:    [GRID_SMALL],
+    query:   { refetchInterval: 15_000 },
+  });
+  const medium = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi:     MINESWEEPER_ABI,
+    functionName: "gridConfigs",
+    args:    [GRID_MEDIUM],
+    query:   { refetchInterval: 15_000 },
+  });
+  const large  = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi:     MINESWEEPER_ABI,
+    functionName: "gridConfigs",
+    args:    [GRID_LARGE],
+    query:   { refetchInterval: 15_000 },
+  });
+  // gridConfigs returns (totalTiles, entryFee, maxPayoutBPS, maxConcurrent, minPoolThreshold, active)
+  return {
+    [GRID_SMALL]:  (small.data as readonly unknown[])?.[4] as bigint ?? 0n,
+    [GRID_MEDIUM]: (medium.data as readonly unknown[])?.[4] as bigint ?? 0n,
+    [GRID_LARGE]:  (large.data as readonly unknown[])?.[4] as bigint ?? 0n,
+  };
+}

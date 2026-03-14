@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGridAvailable } from "@/hooks/usePoolHealth";
+import { useGridAvailable, useMinPoolThresholds } from "@/hooks/usePoolHealth";
 import {
   GRID_INFO,
   DIFF_INFO,
@@ -11,7 +11,6 @@ import {
   DIFF_NORMAL,
   DIFF_HARD,
   formatEth,
-  getMaxPayoutWei,
 } from "@/lib/config";
 
 interface GameSelectProps {
@@ -29,14 +28,14 @@ function GridOption({
   selected,
   onSelect,
   available,
-  maxPayoutLabel,
+  requiredPoolLabel,
 }: {
-  gridSize:       number;
-  difficulty:     number;
-  selected:       boolean;
-  onSelect:       () => void;
-  available:      boolean;
-  maxPayoutLabel: string;
+  gridSize:          number;
+  difficulty:        number;
+  selected:          boolean;
+  onSelect:         () => void;
+  available:         boolean;
+  requiredPoolLabel: string;
 }) {
   const info   = GRID_INFO[gridSize as 0 | 1 | 2];
   const mines  = MINE_COUNTS[gridSize as 0|1|2][difficulty as 0|1|2];
@@ -70,7 +69,7 @@ function GridOption({
       </div>
       {!available && (
         <p className="mt-2 text-xs text-amber-600">
-          Pool insufficient · needs {maxPayoutLabel} ETH
+          Pool insufficient · needs {requiredPoolLabel} ETH in pool
         </p>
       )}
       {selected && available && (
@@ -84,6 +83,7 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
   const [selectedGrid, setSelectedGrid] = useState<number>(GRID_SMALL);
   const [selectedDiff, setSelectedDiff] = useState<number>(DIFF_NORMAL);
 
+  const minPoolThresholds = useMinPoolThresholds();
   const availableSmall  = useGridAvailable(GRID_SMALL, selectedDiff);
   const availableMedium = useGridAvailable(GRID_MEDIUM, selectedDiff);
   const availableLarge  = useGridAvailable(GRID_LARGE, selectedDiff);
@@ -129,7 +129,7 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
               selected={selectedGrid === g}
               onSelect={() => setSelectedGrid(g)}
               available={g === GRID_SMALL ? availableSmall : g === GRID_MEDIUM ? availableMedium : availableLarge}
-              maxPayoutLabel={formatEth(getMaxPayoutWei(g, selectedDiff), 4)}
+              requiredPoolLabel={formatEth(minPoolThresholds[g] ?? 0n, 4)}
             />
           ))}
         </div>
