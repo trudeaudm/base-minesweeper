@@ -75,6 +75,17 @@ export function AdminPage() {
   const [stuckGames, setStuckGames] = useState<StuckGame[]>([]);
   const [cancellingId, setCancellingId] = useState<bigint | null>(null);
   const [txMessage, setTxMessage] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const copyContractAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(CONTRACT_ADDRESS);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setTxMessage("Copy failed");
+    }
+  };
 
   const { data: nextGameId } = useReadContract({
     address: CONTRACT_ADDRESS,
@@ -258,6 +269,23 @@ export function AdminPage() {
               {txMessage}
             </div>
           )}
+
+          {/* Contract address — click to copy */}
+          <section className="border border-gray-200 rounded-[4px] p-4">
+            <h2 className="text-lg font-semibold text-[#111111] mb-2">Contract</h2>
+            <button
+              type="button"
+              onClick={copyContractAddress}
+              className="w-full text-left px-3 py-2.5 font-mono text-sm text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-[4px] transition-colors focus:outline-none focus:ring-2 focus:ring-base-blue/40"
+              title="Click to copy"
+            >
+              <span className="break-all">{CONTRACT_ADDRESS}</span>
+              {copied && (
+                <span className="ml-2 text-accent-green font-sans font-medium">Copied!</span>
+              )}
+            </button>
+            <p className="text-xs text-gray-500 mt-1.5">Click to copy address</p>
+          </section>
 
           {/* 1. Pool Health */}
           <section className="border border-gray-200 rounded-[4px] p-4">
