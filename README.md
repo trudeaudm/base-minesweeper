@@ -85,6 +85,7 @@ npm run dev
 ### contracts/.env
 ```
 PRIVATE_KEY=your_deployer_private_key
+CONTRACT_ADDRESS=0x...   # Deployed Minesweeper (for admin script)
 BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
 BASESCAN_API_KEY=your_basescan_api_key
 VRF_COORDINATOR=0x...     # Chainlink VRF Coordinator (Base Sepolia)
@@ -99,7 +100,29 @@ VITE_CHAIN_ID=84532         # Base Sepolia
 VITE_WALLETCONNECT_PROJECT_ID=your_wc_project_id
 ```
 
-## Contract Admin Functions
+## Contract Admin
+
+A single script handles all admin operations. Set `CONTRACT_ADDRESS` (env or `.env`) and `COMMAND`:
+
+| COMMAND | Description |
+|--------|-------------|
+| `health` | Print pool, reserved, fees, and contract balance |
+| `drain`  | Withdraw all fees and all available pool profits to the owner wallet |
+| `seed`   | Deposit ETH into the pool (requires `AMOUNT_ETH` env var) |
+| `stuck`  | Scan for and cancel all eligible stuck games (block-based thresholds) |
+
+**Usage (run from `contracts/`):**
+
+```bash
+CONTRACT_ADDRESS=0x... COMMAND=health npx hardhat run scripts/admin.ts --network baseSepolia
+CONTRACT_ADDRESS=0x... COMMAND=drain npx hardhat run scripts/admin.ts --network baseSepolia
+CONTRACT_ADDRESS=0x... COMMAND=seed AMOUNT_ETH=0.05 npx hardhat run scripts/admin.ts --network baseSepolia
+CONTRACT_ADDRESS=0x... COMMAND=stuck npx hardhat run scripts/admin.ts --network baseSepolia
+```
+
+Optional env for `stuck`: `DEPLOY_BLOCK`, `CHUNK_SIZE`, `DRY_RUN=1` (list eligible games without sending txs).
+
+## Contract Admin Functions (Solidity)
 
 ```solidity
 setGameConfig(gridSize, entryPriceETH, maxPayoutBPS)
