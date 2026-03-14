@@ -20,7 +20,7 @@ const ENTRY_SMALL  = ethers.parseEther("0.001");
 const ENTRY_MEDIUM = ethers.parseEther("0.005");
 const ENTRY_LARGE  = ethers.parseEther("0.01");
 
-const SESSION_GAS_BUDGET = ethers.parseEther("0.0005");
+const SESSION_GAS_BUDGET = ethers.parseEther("0.0001");
 
 const POOL_SEED = ethers.parseEther("10");
 
@@ -235,7 +235,7 @@ describe("Minesweeper", () => {
         minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
           value: startGameValue(ENTRY_SMALL) - 1n,
         })
-      ).to.be.revertedWith("Insufficient value: entry fee + gas budget");
+      ).to.be.revertedWith("Incorrect payment");
     });
 
     it("rejects concurrent game from same player", async () => {

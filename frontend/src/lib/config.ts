@@ -15,7 +15,7 @@ export const RPC_URL: string =
   (CHAIN_ID === 8453 ? "https://mainnet.base.org" : "https://sepolia.base.org");
 
 /** Session key gas budget (must match Minesweeper.SESSION_GAS_BUDGET). Sent with startGame and forwarded to session key. */
-export const SESSION_GAS_BUDGET = BigInt("500000000000000"); // 0.0005 ETH
+export const SESSION_GAS_BUDGET = BigInt("100000000000000"); // 0.0001 ETH
 
 // Grid sizes
 export const GRID_SMALL  = 0;

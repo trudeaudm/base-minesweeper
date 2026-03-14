@@ -57,7 +57,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     uint256 public constant CANCEL_BLOCKS_WAITING_VRF        = 43200;
 
     // Session key gas budget: forwarded to sessionKey in startGame (self-funded flips/cashout)
-    uint256 public constant SESSION_GAS_BUDGET = 0.0005 ether;
+    uint256 public constant SESSION_GAS_BUDGET = 0.0001 ether;
 
     // ─────────────────────────────────────────────
     // Grid & Difficulty Config
@@ -277,16 +277,15 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         require(cfg.active, "Grid not active");
         require(difficulty <= DIFF_HARD, "Invalid difficulty");
         require(
-            msg.value >= cfg.entryFee + SESSION_GAS_BUDGET,
-            "Insufficient value: entry fee + gas budget"
+            msg.value == cfg.entryFee + SESSION_GAS_BUDGET,
+            "Incorrect payment"
         );
         require(playerActiveGame[msg.sender] == 0, "Active game exists");
         require(activeGameCount[gridSize] < cfg.maxConcurrent, "Grid at capacity");
 
         // Forward gas budget to session key so it can pay for firstFlip / flipTile / cashOut
         if (sessionKey != address(0)) {
-            (bool ok, ) = sessionKey.call{value: SESSION_GAS_BUDGET}("");
-            require(ok, "Gas transfer failed");
+            payable(sessionKey).transfer(SESSION_GAS_BUDGET);
         }
 
         // Pool availability check (payout by difficulty)

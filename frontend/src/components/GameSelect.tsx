@@ -10,6 +10,7 @@ import {
   DIFF_EASY,
   DIFF_NORMAL,
   DIFF_HARD,
+  SESSION_GAS_BUDGET,
   formatEth,
   getMaxPayoutWei,
 } from "@/lib/config";
@@ -64,7 +65,9 @@ function GridOption({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-[#111111] font-mono font-semibold">{info.entryLabel} + 0.0005 ETH gas</div>
+          <div className="text-[#111111] font-mono font-semibold">
+            Entry: {info.entryLabel} + 0.0001 ETH gas = {formatEth(info.entryFee + SESSION_GAS_BUDGET, 4)} ETH total
+          </div>
           <div className="text-gray-500 text-xs font-mono">max {maxMulti}</div>
         </div>
       </div>
@@ -189,7 +192,7 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
         ) : !available ? (
           "Grid Unavailable"
         ) : (
-          `Play — ${GRID_INFO[selectedGrid as 0|1|2].entryLabel} + 0.0005 ETH gas budget`
+          `Play — ${GRID_INFO[selectedGrid as 0|1|2].entryLabel} + 0.0001 ETH gas = ${formatEth(GRID_INFO[selectedGrid as 0|1|2].entryFee + SESSION_GAS_BUDGET, 4)} ETH total`
         )}
       </button>
 
