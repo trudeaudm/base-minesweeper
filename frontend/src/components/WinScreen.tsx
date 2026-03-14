@@ -123,8 +123,8 @@ export function WinScreen({ payout, entryFee, gridSize, difficulty, onPlayAgain 
       >
         {/* Animated logo */}
         <div className="animate-bounce-in mb-6">
-          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-2xl">
-            <BaseLogo size={56} className="opacity-90" />
+          <div className="w-24 h-24 bg-base-blue rounded-[12px] flex items-center justify-center shadow-2xl">
+            <BaseLogo size={56} className="opacity-95" />
           </div>
         </div>
 
@@ -142,7 +142,7 @@ export function WinScreen({ payout, entryFee, gridSize, difficulty, onPlayAgain 
             {formatEth(payout, 5)}
           </div>
           <div className="text-white/80 text-xl font-mono mt-1">ETH</div>
-          <div className="mt-3 inline-block px-4 py-1.5 bg-white/20 rounded-full">
+          <div className="mt-3 inline-block px-4 py-1.5 bg-white/20 rounded-[6px]">
             <span className="text-white font-bold font-mono">{multiplier.toFixed(2)}×</span>
             <span className="text-white/60 text-sm ml-1">your entry</span>
           </div>
@@ -152,7 +152,7 @@ export function WinScreen({ payout, entryFee, gridSize, difficulty, onPlayAgain 
           onClick={onPlayAgain}
           className="
             px-10 py-4 bg-white text-base-blue
-            rounded-xl font-bold text-lg
+            rounded-[6px] font-bold text-lg
             hover:bg-white/90 active:scale-95
             transition-all duration-200 shadow-xl
           "

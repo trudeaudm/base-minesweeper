@@ -23,7 +23,41 @@ export function BaseLogo({
   );
 }
 
-/** Cracked/exploded Base "b" for mine tiles */
+/** Base circle logo: blue circle with white horizontal bar (for mine icon & VRF animation). */
+export function BaseCircleLogo({
+  size = 24,
+  className = "",
+  spinBar = false,
+}: {
+  size?: number;
+  className?: string;
+  spinBar?: boolean;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      <circle cx="16" cy="16" r="14" fill="#0052FF" />
+      <rect
+        x="6"
+        y="13"
+        width="20"
+        height="6"
+        rx="1"
+        fill="white"
+        className={spinBar ? "origin-center animate-vrf-bar-spin" : ""}
+        style={spinBar ? { transformOrigin: "50% 50%", transformBox: "fill-box" } : undefined}
+      />
+    </svg>
+  );
+}
+
+/** Mine tile icon: Base circle logo (shown on red background). */
 export function BaseMineIcon({
   size = 32,
   className = "",
@@ -32,11 +66,8 @@ export function BaseMineIcon({
   className?: string;
 }) {
   return (
-    <span
-      className={`inline-flex items-center justify-center font-bold leading-none ${className}`}
-      style={{ fontSize: size * 0.7, width: size, height: size }}
-    >
-      💥
+    <span className={`inline-flex items-center justify-center ${className}`}>
+      <BaseCircleLogo size={size} />
     </span>
   );
 }

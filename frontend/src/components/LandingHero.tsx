@@ -13,8 +13,8 @@ export function LandingHero() {
         <div className="w-20 h-20 bg-base-blue rounded-full flex items-center justify-center mx-auto mb-4 shadow-cashout">
           <BaseLogo size={44} />
         </div>
-        <h1 className="text-4xl font-bold text-white">Base Minesweeper</h1>
-        <p className="text-white/60 mt-2 text-lg">
+        <h1 className="text-4xl font-bold text-[#111111]">Base Minesweeper</h1>
+        <p className="text-gray-600 mt-2 text-lg">
           Onchain wagering · Provably fair · Base Chain
         </p>
       </div>
@@ -27,23 +27,23 @@ export function LandingHero() {
           { icon: "💸", text: "Cash out any time — no gas popup" },
           { icon: "🏆", text: "Up to 1.95× your entry fee" },
         ].map(({ icon, text }) => (
-          <div key={text} className="flex items-center gap-3 text-left px-4 py-3 bg-white/5 rounded-lg">
+          <div key={text} className="flex items-center gap-3 text-left px-4 py-3 bg-gray-50 rounded-[4px]">
             <span className="text-xl">{icon}</span>
-            <span className="text-white/70 text-sm">{text}</span>
+            <span className="text-gray-700 text-sm">{text}</span>
           </div>
         ))}
       </div>
 
       {/* Pool status per grid */}
       <div className="w-full max-w-xs mb-8">
-        <div className="text-xs text-white/40 uppercase tracking-widest mb-2">Pool Balance</div>
+        <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">Pool Balance</div>
         <div className="space-y-1.5">
           {[GRID_SMALL, GRID_MEDIUM, GRID_LARGE].map(g => {
             const info   = GRID_INFO[g as 0|1|2];
             const hasFunds = pool >= info.entryFee * 2n;
             return (
-              <div key={g} className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-lg">
-                <span className="text-white/70 text-sm">{info.label} ({info.entryLabel})</span>
+              <div key={g} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-[4px]">
+                <span className="text-gray-700 text-sm">{info.label} ({info.entryLabel})</span>
                 <div className="flex items-center gap-1.5">
                   <div className={`w-1.5 h-1.5 rounded-full ${hasFunds ? "bg-accent-green" : "bg-mine"}`} />
                   <span className={`text-xs font-mono ${hasFunds ? "text-accent-green" : "text-mine"}`}>
@@ -54,14 +54,14 @@ export function LandingHero() {
             );
           })}
         </div>
-        <div className="mt-2 text-right text-xs font-mono text-white/30">
+        <div className="mt-2 text-right text-xs font-mono text-gray-500">
           Pool: {isLoading ? "…" : formatEth(pool, 4)} ETH
         </div>
       </div>
 
       {/* CTA */}
       <div className="space-y-3">
-        <p className="text-white/50 text-sm mb-1">Connect your wallet to play</p>
+        <p className="text-gray-500 text-sm mb-1">Connect your wallet to play</p>
         <ConnectButton />
       </div>
     </div>

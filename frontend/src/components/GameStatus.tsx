@@ -54,28 +54,28 @@ export function GameStatusBar({
       ? "text-accent-green"
       : multiplier >= 1.0
       ? "text-accent-yellow"
-      : "text-white";
+      : "text-[#111111]";
 
   return (
     <div className="w-full max-w-xs mx-auto space-y-3">
       {/* Grid info row */}
-      <div className="flex items-center justify-between text-xs text-white/60">
+      <div className="flex items-center justify-between text-xs text-gray-600">
         <span className="font-mono">
           {info.label} &nbsp;·&nbsp;
           <span className={diffInfo.color}>{diffInfo.label}</span>
         </span>
         <span className="font-mono">
-          Entry: <span className="text-white">{formatEth(entryFee, 4)} ETH</span>
+          Entry: <span className="text-[#111111]">{formatEth(entryFee, 4)} ETH</span>
         </span>
       </div>
 
       {/* Progress bar */}
       <div>
-        <div className="flex justify-between text-xs text-white/50 mb-1">
+        <div className="flex justify-between text-xs text-gray-500 mb-1">
           <span>{safeRevealed} / {totalSafe} safe tiles</span>
           <span>{progressPct.toFixed(0)}%</span>
         </div>
-        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
           <div
             className="h-full bg-base-blue rounded-full transition-all duration-300"
             style={{ width: `${progressPct}%` }}
@@ -86,17 +86,17 @@ export function GameStatusBar({
       {/* Multiplier display */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-xs text-white/50 uppercase tracking-widest">Multiplier</div>
+          <div className="text-xs text-gray-500 uppercase tracking-widest">Multiplier</div>
           <div className={`text-3xl font-bold font-mono ${multiplierColor} transition-colors`}>
             {multiplier > 0 ? `${multiplier.toFixed(2)}×` : "0.00×"}
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xs text-white/50 uppercase tracking-widest">Current win</div>
-          <div className="text-xl font-mono font-semibold text-white">
+          <div className="text-xs text-gray-500 uppercase tracking-widest">Current win</div>
+          <div className="text-xl font-mono font-semibold text-[#111111]">
             {formatEth(currentPayout, 5)} ETH
           </div>
-          <div className="text-xs text-white/40 font-mono">
+          <div className="text-xs text-gray-500 font-mono">
             max {formatEth(maxPayout, 5)} ETH
           </div>
         </div>
@@ -112,14 +112,14 @@ export function GameStatusBar({
         </div>
       )}
 
-      {/* Waiting for VRF after first click */}
+      {/* Waiting for VRF after first click — animation is on the board */}
       {isWaitingVRF && (
         <div className="text-center py-3 space-y-2">
           <div className="inline-flex items-center gap-2 text-base-blue text-sm">
             <div className="w-4 h-4 border-2 border-base-blue border-t-transparent rounded-full animate-spin" />
             Generating mine layout…
           </div>
-          <p className="text-xs text-white/40">
+          <p className="text-xs text-gray-500">
             Waiting for Chainlink VRF randomness
           </p>
         </div>
@@ -129,15 +129,15 @@ export function GameStatusBar({
       {showCancelUI && (
         <div className="space-y-2">
           {blocksUntilCancel > 0 ? (
-            <p className="text-xs text-white/40 text-center">
-              Cancel available in <span className="font-mono text-white/60">{blocksUntilCancel}</span> blocks
+            <p className="text-xs text-gray-500 text-center">
+              Cancel available in <span className="font-mono text-gray-700">{blocksUntilCancel}</span> blocks
               {cancelThresholdBlocks === 43200 && " (~24h on Base)"}
             </p>
           ) : canCancel ? (
             <>
               {isWaitingVRF && (
-                <div className="px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                  <p className="text-xs text-yellow-400 text-center">
+                <div className="px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-[4px]">
+                  <p className="text-xs text-yellow-700 text-center">
                     VRF is taking longer than expected. You can cancel and refund your ETH.
                   </p>
                 </div>
@@ -146,16 +146,16 @@ export function GameStatusBar({
                 onClick={onCancelGame}
                 disabled={isCancelling}
                 className={`
-                  w-full py-3 rounded-xl font-bold text-sm transition-all duration-200
+                  w-full py-3 rounded-[6px] font-bold text-sm transition-all duration-200
                   ${!isCancelling
                     ? "bg-yellow-600 hover:bg-yellow-500 text-white active:scale-95"
-                    : "bg-white/10 text-white/30 cursor-not-allowed"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
                   }
                 `}
               >
                 {isCancelling ? (
                   <span className="inline-flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-base-blue border-t-transparent rounded-full animate-spin" />
                     Cancelling…
                   </span>
                 ) : (
@@ -173,10 +173,10 @@ export function GameStatusBar({
           onClick={onCashOut}
           disabled={!canCashout || isCashingOut}
           className={`
-            w-full py-3.5 rounded-xl font-bold text-lg transition-colors duration-200
+            w-full py-3.5 rounded-[6px] font-bold text-lg transition-colors duration-200
             ${canCashout && !isCashingOut
               ? "bg-base-blue hover:bg-blue-500 text-white animate-cashout-glow active:scale-95"
-              : "bg-white/10 text-white/30 cursor-not-allowed"
+              : "bg-gray-200 text-gray-400 cursor-not-allowed"
             }
           `}
           style={canCashout && !isCashingOut ? {

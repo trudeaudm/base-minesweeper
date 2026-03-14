@@ -33,7 +33,7 @@ export function GameOverScreen({ entryFee, gridSize, difficulty, onPlayAgain }: 
     >
       {/* Exploded icon */}
       <div className="animate-bounce-in mb-6">
-        <div className="w-24 h-24 bg-mine rounded-full flex items-center justify-center shadow-tile-mine">
+        <div className="w-24 h-24 bg-mine rounded-[12px] flex items-center justify-center shadow-tile-mine">
           <BaseMineIcon size={56} />
         </div>
       </div>
@@ -55,7 +55,7 @@ export function GameOverScreen({ entryFee, gridSize, difficulty, onPlayAgain }: 
         onClick={onPlayAgain}
         className="
           px-10 py-4 bg-base-blue text-white
-          rounded-xl font-bold text-lg
+          rounded-[6px] font-bold text-lg
           hover:bg-blue-500 active:scale-95
           transition-all duration-200 shadow-xl
         "

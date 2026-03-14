@@ -43,29 +43,29 @@ function GridOption({
       onClick={onSelect}
       disabled={!available}
       className={`
-        relative w-full p-4 rounded-xl border-2 text-left transition-all duration-200
+        relative w-full p-4 rounded-[6px] border-2 text-left transition-all duration-200
         ${selected
-          ? "border-base-blue bg-base-blue/20 shadow-cashout"
+          ? "border-base-blue bg-base-blue/15 shadow-cashout"
           : available
-          ? "border-white/10 bg-white/5 hover:border-base-blue/50 hover:bg-white/10"
-          : "border-white/5 bg-white/2 opacity-40 cursor-not-allowed"
+          ? "border-gray-200 bg-gray-50 hover:border-base-blue/50 hover:bg-gray-100"
+          : "border-gray-100 bg-gray-50/50 opacity-40 cursor-not-allowed"
         }
       `}
     >
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-white font-bold text-lg">{info.label}</div>
-          <div className="text-white/50 text-xs mt-0.5">
+          <div className="text-[#111111] font-bold text-lg">{info.label}</div>
+          <div className="text-gray-500 text-xs mt-0.5">
             {info.totalTiles} tiles · {mines} mines
           </div>
         </div>
         <div className="text-right">
-          <div className="text-white font-mono font-semibold">{info.entryLabel}</div>
-          <div className="text-white/40 text-xs font-mono">max {maxMulti}</div>
+          <div className="text-[#111111] font-mono font-semibold">{info.entryLabel}</div>
+          <div className="text-gray-500 text-xs font-mono">max {maxMulti}</div>
         </div>
       </div>
       {!available && (
-        <div className="mt-2 text-xs text-white/40 italic">Temporarily Unavailable</div>
+        <div className="mt-2 text-xs text-gray-500 italic">Temporarily Unavailable</div>
       )}
       {selected && available && (
         <div className="absolute top-2 right-2 w-2 h-2 bg-base-blue rounded-full" />
@@ -84,10 +84,10 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
     <div className="w-full max-w-sm mx-auto space-y-6">
       {/* Pool health */}
       <div className="flex items-center justify-between px-1">
-        <span className="text-xs text-white/40 uppercase tracking-widest">Pool balance</span>
+        <span className="text-xs text-gray-500 uppercase tracking-widest">Pool balance</span>
         <div className="flex items-center gap-1.5">
           <div className={`w-2 h-2 rounded-full ${poolBalance > 0n ? "bg-accent-green animate-pulse" : "bg-mine"}`} />
-          <span className="font-mono text-sm text-white/70">
+          <span className="font-mono text-sm text-gray-700">
             {formatEth(poolBalance, 4)} ETH
           </span>
         </div>
@@ -95,7 +95,7 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
 
       {/* Grid selection */}
       <div>
-        <div className="text-xs text-white/40 uppercase tracking-widest mb-3">Select grid</div>
+        <div className="text-xs text-gray-500 uppercase tracking-widest mb-3">Select grid</div>
         <div className="space-y-2">
           {GRIDS.map(g => (
             <GridOption
@@ -111,7 +111,7 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
 
       {/* Difficulty selection */}
       <div>
-        <div className="text-xs text-white/40 uppercase tracking-widest mb-3">Difficulty</div>
+        <div className="text-xs text-gray-500 uppercase tracking-widest mb-3">Difficulty</div>
         <div className="grid grid-cols-3 gap-2">
           {DIFFS.map(d => {
             const info = DIFF_INFO[d];
@@ -121,10 +121,10 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
                 key={d}
                 onClick={() => setSelectedDiff(d)}
                 className={`
-                  py-2.5 rounded-lg font-medium text-sm transition-all
+                  py-2.5 rounded-[4px] font-medium text-sm transition-all
                   ${sel
                     ? "bg-base-blue text-white border-2 border-base-blue"
-                    : "bg-white/5 text-white/60 border-2 border-white/10 hover:border-white/30"
+                    : "bg-gray-50 text-gray-600 border-2 border-gray-200 hover:border-gray-300"
                   }
                 `}
               >
@@ -133,7 +133,7 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
             );
           })}
         </div>
-        <p className="mt-2 text-xs text-white/30 text-center">
+        <p className="mt-2 text-xs text-gray-500 text-center">
           {selectedDiff === DIFF_HARD
             ? "Hard mode pays up to 1.95× entry"
             : "Easy / Normal pay up to 1.90× entry"
@@ -146,16 +146,16 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
         onClick={() => onStart(selectedGrid, selectedDiff)}
         disabled={!available || isStarting}
         className={`
-          w-full py-4 rounded-xl font-bold text-lg transition-all duration-200
+          w-full py-4 rounded-[6px] font-bold text-lg transition-all duration-200
           ${available && !isStarting
             ? "bg-base-blue hover:bg-blue-500 text-white shadow-cashout active:scale-95"
-            : "bg-white/10 text-white/30 cursor-not-allowed"
+            : "bg-gray-200 text-gray-400 cursor-not-allowed"
           }
         `}
       >
         {isStarting ? (
           <span className="inline-flex items-center justify-center gap-2">
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            <div className="w-5 h-5 border-2 border-base-blue border-t-transparent rounded-full animate-spin" />
             Starting game…
           </span>
         ) : !available ? (
@@ -165,7 +165,7 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
         )}
       </button>
 
-      <p className="text-center text-xs text-white/30">
+      <p className="text-center text-xs text-gray-500">
         5% platform fee · Chainlink VRF fairness · Base Sepolia
       </p>
     </div>

@@ -9,7 +9,8 @@ interface TileProps {
   onClick:        (index: number) => void;
   disabled:       boolean;
   isCashout?:     boolean;  // pulse hint: player can cash out
-  isWaitingVRF?:  boolean;  // wave animation during VRF wait
+  isWaitingVRF?:  boolean;  // VRF wait: bounce overlay on board; no per-tile wave
+  isHighlighted?: boolean;  // blue glow when VRF bounce logo lands on this tile
   isGameOver?:    boolean;  // fade unrevealed tiles to dark on loss
   isWinReveal?:   boolean;  // flip unrevealed tiles to white on win
 }
@@ -36,6 +37,7 @@ export function Tile({
   disabled,
   isCashout      = false,
   isWaitingVRF   = false,
+  isHighlighted  = false,
   isGameOver     = false,
   isWinReveal    = false,
 }: TileProps) {
@@ -47,10 +49,6 @@ export function Tile({
 
   const col = index % cols;
   const row = Math.floor(index / cols);
-
-  // VRF wave: negative delay so each tile is already mid-wave at different phases,
-  // creating the continuous left-to-right sweep effect.
-  const vrfDelay = `-${(col * 80 + row * 20) % 1800}ms`;
 
   // Win / game-over reveals stagger left-to-right, top-to-bottom.
   const revealDelay = `${col * 55 + row * 35}ms`;
@@ -65,7 +63,7 @@ export function Tile({
         <div
           className="
             relative flex items-center justify-center
-            rounded-md w-full aspect-square
+            rounded-[3px] w-full aspect-square
             bg-mine shadow-tile-mine
             animate-mine-reveal cursor-default
             border border-red-300/30
@@ -85,7 +83,7 @@ export function Tile({
         <div
           className="
             relative flex items-center justify-center
-            rounded-md w-full aspect-square
+            rounded-[3px] w-full aspect-square
             bg-neutral-100 border border-neutral-300/60
             shadow-tile-safe cursor-default
             animate-tile-flip
@@ -107,7 +105,7 @@ export function Tile({
       <div
         className="
           relative flex items-center justify-center
-          rounded-md w-full aspect-square
+          rounded-[3px] w-full aspect-square
           bg-blue-700/60 border border-base-blue/50
           cursor-wait
         "
@@ -122,7 +120,7 @@ export function Tile({
     return (
       <div style={{ perspective: "600px" }}>
         <div
-          className="rounded-md w-full aspect-square bg-base-blue animate-win-tile"
+          className="rounded-[3px] w-full aspect-square bg-base-blue animate-win-tile"
           style={{ animationDelay: revealDelay }}
         />
       </div>
@@ -133,7 +131,7 @@ export function Tile({
   if (isGameOver) {
     return (
       <div
-        className="rounded-md w-full aspect-square bg-base-blue animate-game-over-fade"
+        className="rounded-[3px] w-full aspect-square bg-base-blue animate-game-over-fade"
         style={{ animationDelay: fadeDelay }}
       />
     );
@@ -146,17 +144,16 @@ export function Tile({
       disabled={disabled}
       className={`
         relative flex items-center justify-center
-        rounded-md w-full aspect-square
-        border border-blue-400/20
+        rounded-[3px] w-full aspect-square
+        border border-blue-400/25
         shadow-tile
         ${disabled
           ? `cursor-not-allowed bg-base-blue ${isWaitingVRF ? "" : "opacity-60"}`
           : "cursor-pointer bg-base-blue hover:bg-blue-500 active:scale-95 hover:shadow-cashout transition-colors duration-150"
         }
-        ${isWaitingVRF                          ? "animate-vrf-wave"   : ""}
         ${isCashout && !disabled && !isWaitingVRF ? "animate-pulse-slow" : ""}
+        ${isHighlighted ? "shadow-tile-glow ring-2 ring-base-blue/40" : ""}
       `}
-      style={isWaitingVRF ? { animationDelay: vrfDelay } : undefined}
       aria-label={`Tile ${index}`}
     />
   );

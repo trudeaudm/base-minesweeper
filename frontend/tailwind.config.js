@@ -32,8 +32,13 @@ export default {
         "win-tile":        "winTile 0.4s ease-out forwards",
         "game-over-fade":  "gameOverFade 0.45s ease-out forwards",
         "cashout-glow":    "cashoutGlow 2s ease-in-out infinite",
+        "vrf-bar-spin":    "vrfBarSpin 0.4s linear infinite",
       },
       keyframes: {
+        vrfBarSpin: {
+          "0%":   { transform: "rotate(0deg)" },
+          "100%": { transform: "rotate(360deg)" },
+        },
         // ── Tile flip: new element starts visually blue (matching unrevealed),
         //    folds to edge at 40%, unfolds as light/white at 60 %.
         tileFlip: {
@@ -96,10 +101,11 @@ export default {
         },
       },
       boxShadow: {
-        "tile":      "0 2px 8px rgba(0,82,255,0.4)",
-        "tile-safe": "0 1px 4px rgba(0,0,0,0.25)",
-        "tile-mine": "0 2px 8px rgba(255,68,68,0.6)",
-        "cashout":   "0 0 20px rgba(0,82,255,0.6)",
+        "tile":      "0 2px 8px rgba(0,82,255,0.35)",
+        "tile-safe": "0 1px 4px rgba(0,0,0,0.12)",
+        "tile-mine": "0 2px 8px rgba(255,68,68,0.5)",
+        "cashout":   "0 0 20px rgba(0,82,255,0.5)",
+        "tile-glow": "0 0 14px rgba(0,82,255,0.7), 0 0 6px rgba(0,82,255,0.4)",
       },
     },
   },
