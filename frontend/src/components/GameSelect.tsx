@@ -10,7 +10,6 @@ import {
   DIFF_EASY,
   DIFF_NORMAL,
   DIFF_HARD,
-  SESSION_GAS_BUDGET,
   formatEth,
   getMaxPayoutWei,
 } from "@/lib/config";
@@ -57,24 +56,22 @@ function GridOption({
         }
       `}
     >
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-[#111111] font-bold text-lg">{info.label}</div>
-          <div className="text-gray-500 text-xs mt-0.5">
-            {info.totalTiles} tiles · {mines} mines
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-[#111111] font-mono font-semibold">
-            Entry: {info.entryLabel} + 0.0001 ETH gas = {formatEth(info.entryFee + SESSION_GAS_BUDGET, 4)} ETH total
-          </div>
-          <div className="text-gray-500 text-xs font-mono">max {maxMulti}</div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-[#111111] font-bold text-lg">{info.label}</div>
+        <div className="text-[#111111] font-mono font-semibold text-right shrink-0">
+          {info.entryLabel}
         </div>
       </div>
-      {!available && (
-        <div className="mt-2 text-xs text-gray-500">
-          Pool insufficient · needs {maxPayoutLabel} ETH to activate
+      <div className="flex items-start justify-between gap-2 mt-1">
+        <div className="text-gray-500 text-xs">
+          {info.totalTiles} tiles · {mines} mines
         </div>
+        <div className="text-gray-500 text-xs font-mono shrink-0">max {maxMulti}</div>
+      </div>
+      {!available && (
+        <p className="mt-2 text-xs text-amber-600">
+          Pool insufficient · needs {maxPayoutLabel} ETH
+        </p>
       )}
       {selected && available && (
         <div className="absolute top-2 right-2 w-2 h-2 bg-base-blue rounded-full" />
@@ -192,12 +189,12 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
         ) : !available ? (
           "Grid Unavailable"
         ) : (
-          `Play — ${GRID_INFO[selectedGrid as 0|1|2].entryLabel} + 0.0001 ETH gas = ${formatEth(GRID_INFO[selectedGrid as 0|1|2].entryFee + SESSION_GAS_BUDGET, 4)} ETH total`
+          `Play — ${GRID_INFO[selectedGrid as 0|1|2].entryLabel}`
         )}
       </button>
 
       <p className="text-center text-xs text-gray-500">
-        5% platform fee · Chainlink VRF fairness · Base Sepolia
+        5% platform fee · Chainlink VRF fairness · Base Sepolia · +gas fees apply
       </p>
     </div>
   );

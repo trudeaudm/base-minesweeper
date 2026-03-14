@@ -1,18 +1,20 @@
 import { type TileState } from "@/hooks/useGame";
 import { BaseMineIcon } from "./BaseLogo";
+import type { ExplosionPhase } from "./GameBoard";
 
 interface TileProps {
-  index:          number;
-  cols:           number;
-  state:          TileState;
-  adjacentCount?: number;
-  onClick:        (index: number) => void;
-  disabled:       boolean;
-  isCashout?:     boolean;  // pulse hint: player can cash out
-  isWaitingVRF?:  boolean;  // VRF wait: bounce overlay on board; no per-tile wave
-  isHighlighted?: boolean;  // blue glow when VRF bounce logo lands on this tile
-  isGameOver?:    boolean;  // fade unrevealed tiles to dark on loss
-  isWinReveal?:   boolean;  // flip unrevealed tiles to white on win
+  index:           number;
+  cols:            number;
+  state:           TileState;
+  adjacentCount?:  number;
+  onClick:         (index: number) => void;
+  disabled:         boolean;
+  isCashout?:      boolean;  // pulse hint: player can cash out
+  isWaitingVRF?:   boolean;  // VRF wait: bounce overlay on board; no per-tile wave
+  isHighlighted?:  boolean;  // blue glow when VRF bounce logo lands on this tile
+  isGameOver?:     boolean;  // fade unrevealed tiles to dark on loss
+  isWinReveal?:    boolean;  // flip unrevealed tiles to white on win
+  explosionPhase?: ExplosionPhase;  // mine explosion sequence: pending | exploding | exploded
 }
 
 // Classic minesweeper number colors — tuned for light (white) tile background
@@ -35,11 +37,12 @@ export function Tile({
   adjacentCount,
   onClick,
   disabled,
-  isCashout      = false,
-  isWaitingVRF   = false,
-  isHighlighted  = false,
-  isGameOver     = false,
-  isWinReveal    = false,
+  isCashout       = false,
+  isWaitingVRF    = false,
+  isHighlighted   = false,
+  isGameOver      = false,
+  isWinReveal     = false,
+  explosionPhase,
 }: TileProps) {
   const handleClick = () => {
     if (!disabled && state === "unrevealed") {
@@ -56,7 +59,50 @@ export function Tile({
   // Game-over unrevealed tiles start fading after the mine flash peaks (~200 ms).
   const fadeDelay = `${200 + col * 18 + row * 12}ms`;
 
-  // ── Mine ─────────────────────────────────────────────────────────────────
+  // ── Explosion sequence (mines in staggered order) ─────────────────────────
+  if (explosionPhase !== undefined) {
+    if (explosionPhase === "pending") {
+      return (
+        <div
+          className="rounded-[3px] w-full aspect-square bg-base-blue border border-blue-400/25 opacity-60 cursor-default"
+          aria-hidden
+        />
+      );
+    }
+    if (explosionPhase === "exploding") {
+      return (
+        <div style={{ perspective: "600px" }}>
+          <div
+            className="
+              relative flex items-center justify-center
+              rounded-[3px] w-full aspect-square
+              animate-tile-explode cursor-default
+              border border-red-300/50 shadow-tile-mine
+            "
+          >
+            <BaseMineIcon size={24} className="opacity-90" />
+          </div>
+        </div>
+      );
+    }
+    // exploded
+    return (
+      <div style={{ perspective: "600px" }}>
+        <div
+          className="
+            relative flex items-center justify-center
+            rounded-[3px] w-full aspect-square
+            bg-[#dd2c00] shadow-tile-mine cursor-default
+            border border-red-300/30
+          "
+        >
+          <BaseMineIcon size={24} />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Mine (single reveal, no explosion sequence) ───────────────────────────
   if (state === "mine") {
     return (
       <div style={{ perspective: "600px" }}>

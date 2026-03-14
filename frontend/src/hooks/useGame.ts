@@ -27,6 +27,23 @@ import {
   createSessionWalletClient,
 } from "@/lib/session";
 
+/** Returns a short user-facing message for wallet rejections; otherwise the original message. */
+function normalizeWalletError(e: unknown, action?: string): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  const code = e && typeof e === "object" && "code" in e ? (e as { code: unknown }).code : null;
+  const shortMsg =
+    e && typeof e === "object" && "shortMessage" in e
+      ? (e as { shortMessage: string }).shortMessage
+      : "";
+  const isRejection =
+    code === 4001 ||
+    /rejected the request|user rejected|user denied|denied transaction/i.test(msg) ||
+    /rejected the request|user rejected|user denied/i.test(shortMsg);
+  if (isRejection)
+    return action ? `You declined to ${action}.` : "You declined the transaction.";
+  return msg || "Something went wrong.";
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type TileState =
@@ -151,12 +168,14 @@ export function useGame() {
   const { address: playerAddress } = useAccount();
   const publicClient = usePublicClient();
 
-  const [gameState, setGameState]   = useState<GameState>(EMPTY_STATE);
-  const [pendingTile, setPendingTile] = useState<number | null>(null);
-  const [isStarting, setIsStarting]   = useState(false);
+  const [gameState, setGameState]       = useState<GameState>(EMPTY_STATE);
+  const [pendingTile, setPendingTile]   = useState<number | null>(null);
+  const [mineHitTileIndex, setMineHitTileIndex] = useState<number | null>(null);
+  const [explosionComplete, setExplosionComplete] = useState(true);
+  const [isStarting, setIsStarting]     = useState(false);
   const [isCashingOut, setIsCashingOut] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
-  const [error, setError]             = useState<string | null>(null);
+  const [error, setError]               = useState<string | null>(null);
   const sessionAcc = useRef(getOrCreateSessionKey());
 
   // ── Current block number (for block-based cancel countdown) ───────────────
@@ -209,6 +228,10 @@ export function useGame() {
     const payout     = safeRevealed === 0
       ? 0n
       : (maxPayout * BigInt(safeRevealed)) / BigInt(totalSafe);
+
+    if (status !== GameStatus.GAME_OVER) {
+      setMineHitTileIndex(null);
+    }
 
     const tiles = buildTileStates(totalTiles, revealedBitmask, mineBitmask);
     if (pendingTile !== null && tiles[pendingTile] === "unrevealed") {
@@ -292,7 +315,7 @@ export function useGame() {
         }
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to start game");
+      setError(normalizeWalletError(e, "start the game"));
     } finally {
       setIsStarting(false);
     }
@@ -350,6 +373,10 @@ export function useGame() {
           args:    [gameState.gameId],
         });
         const status = Number((raw as readonly unknown[])[10]);
+        if (status === GameStatus.GAME_OVER) {
+          setMineHitTileIndex(tileIndex);
+          setExplosionComplete(false);
+        }
         if (status === GameStatus.CASHED_OUT || status === GameStatus.GAME_OVER) {
           if (playerAddress) {
             await sweepSessionKeyToPlayer(publicClient, playerAddress);
@@ -359,7 +386,7 @@ export function useGame() {
         }
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to flip tile");
+      setError(normalizeWalletError(e));
     } finally {
       // For regular flips clear immediately; for first flip the pending tile
       // stays visible (showing as "pending") until VRF resolves and the
@@ -407,7 +434,7 @@ export function useGame() {
         clearSessionKey();
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to cash out");
+      setError(normalizeWalletError(e, "cash out"));
     } finally {
       setIsCashingOut(false);
     }
@@ -468,7 +495,7 @@ export function useGame() {
       await refetchActiveGame();
       return true;
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to cancel game");
+      setError(normalizeWalletError(e, "cancel the game"));
       return false;
     } finally {
       setIsCancelling(false);
@@ -478,19 +505,28 @@ export function useGame() {
   // ── Reset (start over after win/loss) ────────────────────────────────────
   const resetGame = useCallback(() => {
     setGameState(EMPTY_STATE);
+    setMineHitTileIndex(null);
+    setExplosionComplete(true);
     setError(null);
     clearSessionKey();
     refetchActiveGame();
   }, [refetchActiveGame]);
 
   // ── Block-based cancel eligibility ──────────────────────────────────────
+  // Only consider cancel state once we have on-chain startBlock (avoids button flash before sync).
+  const cancelBlockDataReady = gameState.startBlock > 0n;
   const cancelThresholdBlocks =
     gameState.isWaitingFirstFlip ? CANCEL_BLOCKS_WAITING_FIRST_FLIP : CANCEL_BLOCKS_WAITING_VRF;
   const cancelBlock = gameState.startBlock + BigInt(cancelThresholdBlocks);
-  const canCancel = currentBlock > 0n && cancelBlock > 0n && currentBlock > cancelBlock;
-  const blocksUntilCancel = currentBlock > 0n && cancelBlock > currentBlock
-    ? Number(cancelBlock - currentBlock)
-    : 0;
+  const canCancel = cancelBlockDataReady && currentBlock > 0n && cancelBlock > 0n && currentBlock > cancelBlock;
+  const blocksUntilCancel =
+    cancelBlockDataReady && currentBlock > 0n && cancelBlock > currentBlock
+      ? Number(cancelBlock - currentBlock)
+      : 0;
+
+  const onExplosionComplete = useCallback(() => {
+    setExplosionComplete(true);
+  }, []);
 
   return {
     gameState,
@@ -499,9 +535,13 @@ export function useGame() {
     isCancelling,
     pendingTile,
     error,
+    explosionComplete,
+    mineHitTileIndex,
+    onExplosionComplete,
     sessionKeyAddr: sessionAcc.current.address,
     currentBlock:   currentBlock,
     startBlock:      gameState.startBlock,
+    cancelBlockDataReady,
     blocksUntilCancel,
     canCancel,
     cancelThresholdBlocks,

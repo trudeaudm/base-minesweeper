@@ -15,8 +15,9 @@ interface GameStatusProps {
   isWaitingFirstFlip: boolean;
   isWaitingVRF:       boolean;
   // Block-based cancel: WAITING_FIRST_FLIP after 100 blocks, WAITING_VRF after 43200
-  blocksUntilCancel:  number;
-  canCancel:          boolean;
+  cancelBlockDataReady: boolean;  // true once startBlock is loaded from chain (avoids button flash)
+  blocksUntilCancel:   number;
+  canCancel:           boolean;
   cancelThresholdBlocks: number;
   onCancelGame:       () => void;
   isCancelling:       boolean;
@@ -36,6 +37,7 @@ export function GameStatusBar({
   isCashingOut,
   isWaitingFirstFlip,
   isWaitingVRF,
+  cancelBlockDataReady,
   blocksUntilCancel,
   canCancel,
   cancelThresholdBlocks,
@@ -46,7 +48,7 @@ export function GameStatusBar({
   const diffInfo   = DIFF_INFO[difficulty as 0 | 1 | 2];
   const isActive   = status === GameStatus.ACTIVE;
   const canCashout = isActive && safeRevealed > 0;
-  const showCancelUI = isWaitingFirstFlip || isWaitingVRF;
+  const showCancelUI = (isWaitingFirstFlip || isWaitingVRF) && cancelBlockDataReady;
 
   const progressPct = totalSafe > 0 ? (safeRevealed / totalSafe) * 100 : 0;
   const multiplierColor =

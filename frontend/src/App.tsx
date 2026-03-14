@@ -20,9 +20,13 @@ function GameApp() {
     isCashingOut,
     isCancelling,
     error,
+    cancelBlockDataReady,
     blocksUntilCancel,
     canCancel,
     cancelThresholdBlocks,
+    explosionComplete,
+    mineHitTileIndex,
+    onExplosionComplete,
     startGame,
     flipTile,
     cashOut,
@@ -104,6 +108,7 @@ function GameApp() {
               isCashingOut={isCashingOut}
               isWaitingFirstFlip={gameState.isWaitingFirstFlip}
               isWaitingVRF={gameState.isWaitingVRF}
+              cancelBlockDataReady={cancelBlockDataReady}
               blocksUntilCancel={blocksUntilCancel}
               canCancel={canCancel}
               cancelThresholdBlocks={cancelThresholdBlocks}
@@ -119,6 +124,8 @@ function GameApp() {
               status={gameState.status}
               onFlip={flipTile}
               isCashout={gameState.safeRevealed > 0 && gameState.isActive}
+              mineHitTileIndex={mineHitTileIndex}
+              onExplosionComplete={onExplosionComplete}
             />
 
             {/* Session key indicator */}
@@ -148,8 +155,8 @@ function GameApp() {
         />
       )}
 
-      {/* Game over overlay */}
-      {gameState.isGameOver && (
+      {/* Game over overlay (after explosion sequence when applicable) */}
+      {gameState.isGameOver && explosionComplete && (
         <GameOverScreen
           entryFee={gameState.entryFee}
           gridSize={gameState.gridSize}

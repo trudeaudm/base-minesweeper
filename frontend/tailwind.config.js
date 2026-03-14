@@ -33,6 +33,8 @@ export default {
         "game-over-fade":  "gameOverFade 0.45s ease-out forwards",
         "cashout-glow":    "cashoutGlow 2s ease-in-out infinite",
         "vrf-bar-spin":    "vrfBarSpin 0.4s linear infinite",
+        "tile-explode":    "tileExplode 0.25s ease-out forwards",
+        "screen-shake":    "screenShake 0.3s ease-out forwards",
       },
       keyframes: {
         vrfBarSpin: {
@@ -98,6 +100,20 @@ export default {
         cashoutGlow: {
           "0%, 100%": { boxShadow: "0 0 10px rgba(0,82,255,0.45)" },
           "50%":      { boxShadow: "0 0 28px rgba(0,82,255,0.85), 0 0 54px rgba(0,82,255,0.3)" },
+        },
+        // ── Mine explosion: flash white, scale pulse, settle red/orange
+        tileExplode: {
+          "0%":   { backgroundColor: "#ffffff", transform: "scale(1)" },
+          "25%":  { backgroundColor: "#ffffff", transform: "scale(1.3)" },
+          "100%": { backgroundColor: "#dd2c00", transform: "scale(1)" },
+        },
+        screenShake: {
+          "0%, 100%":  { transform: "translate(0, 0)" },
+          "15%":       { transform: "translate(-4px, 2px)" },
+          "30%":       { transform: "translate(4px, -2px)" },
+          "45%":       { transform: "translate(-3px, 1px)" },
+          "60%":       { transform: "translate(3px, -1px)" },
+          "75%":       { transform: "translate(-2px, 0)" },
         },
       },
       boxShadow: {
