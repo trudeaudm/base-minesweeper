@@ -49,7 +49,7 @@ function Confetti() {
     let animId: number;
 
     function render() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx!.clearRect(0, 0, canvas!.width, canvas!.height);
       particles.forEach((p) => {
         p.vy       += 0.28;          // gravity
         p.x        += p.vx;
@@ -57,14 +57,14 @@ function Confetti() {
         p.rotation += p.rotSpeed;
         if (frame > 70) p.opacity -= 1 / (totalFrames - 70);
 
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, p.opacity);
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rotation);
-        ctx.fillStyle = p.color;
+        ctx!.save();
+        ctx!.globalAlpha = Math.max(0, p.opacity);
+        ctx!.translate(p.x, p.y);
+        ctx!.rotate(p.rotation);
+        ctx!.fillStyle = p.color;
         // Draw as a flat rectangular confetti piece
-        ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
-        ctx.restore();
+        ctx!.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+        ctx!.restore();
       });
       frame++;
       if (frame < totalFrames) animId = requestAnimationFrame(render);
