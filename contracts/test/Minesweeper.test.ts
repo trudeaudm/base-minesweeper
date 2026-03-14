@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
+import { mine } from "@nomicfoundation/hardhat-network-helpers";
 import { Minesweeper, VRFCoordinatorV2_5Mock } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
@@ -814,15 +815,14 @@ describe("Minesweeper", () => {
     });
   });
 
-  // ─── Emergency Cancel ────────────────────────────────────
+  // ─── Emergency Cancel (block-based thresholds) ───────────────────────────
   describe("cancelStuckGame", () => {
-    it("can cancel after 24h if player never made first flip", async () => {
+    it("can cancel after 100 blocks if player never made first flip", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
         value: ENTRY_SMALL,
       });
-      await ethers.provider.send("evm_increaseTime", [25 * 3600]);
-      await ethers.provider.send("evm_mine", []);
+      await mine(101);
 
       const gameId = await minesweeper.playerActiveGame(player.address);
       await expect(
@@ -833,15 +833,13 @@ describe("Minesweeper", () => {
       expect(g.status).to.equal(GameStatus.CANCELLED);
     });
 
-    it("can cancel after 24h if VRF never returned", async () => {
+    it("can cancel after 43200 blocks if VRF never returned", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
         value: ENTRY_SMALL,
       });
-      // Call firstFlip to get into WAITING_VRF (don't fulfill VRF)
       await minesweeper.connect(player).firstFlip(1n, 0);
-      await ethers.provider.send("evm_increaseTime", [25 * 3600]);
-      await ethers.provider.send("evm_mine", []);
+      await mine(43201);
 
       const gameId = await minesweeper.playerActiveGame(player.address);
       const g = await minesweeper.getGame(gameId);
@@ -851,7 +849,7 @@ describe("Minesweeper", () => {
       ).to.not.be.reverted;
     });
 
-    it("rejects cancel before 24h", async () => {
+    it("rejects cancel before block threshold", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_NORMAL, ethers.ZeroAddress, {
         value: ENTRY_SMALL,
@@ -859,7 +857,7 @@ describe("Minesweeper", () => {
       const gameId = await minesweeper.playerActiveGame(player.address);
       await expect(
         minesweeper.connect(player).cancelStuckGame(gameId)
-      ).to.be.revertedWith("Too early");
+      ).to.be.revertedWith("Cancel available after block threshold");
     });
   });
 

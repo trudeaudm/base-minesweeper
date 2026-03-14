@@ -50,6 +50,10 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     uint16 public constant MAX_PAYOUT_BPS_HARD   = 19500; // 1.95×
     uint16 public constant BPS_DENOMINATOR        = 10000;
 
+    // Block-based cancellation thresholds (~3.3 min and ~24h on Base at 2s/block)
+    uint256 public constant CANCEL_BLOCKS_WAITING_FIRST_FLIP = 100;
+    uint256 public constant CANCEL_BLOCKS_WAITING_VRF        = 43200;
+
     // ─────────────────────────────────────────────
     // Grid & Difficulty Config
     // ─────────────────────────────────────────────
@@ -96,6 +100,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         uint8    totalSafe;       // totalTiles - mineCount
         GameStatus status;
         uint256  vrfRequestId;
+        uint256  startBlock;      // block number when startGame() was called (for cancellation thresholds)
         uint256  startedAt;
         uint256  endedAt;
     }
@@ -311,6 +316,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
             totalSafe:        totalSafe,
             status:           GameStatus.WAITING_FIRST_FLIP,
             vrfRequestId:     0,
+            startBlock:       block.number,
             startedAt:        block.timestamp,
             endedAt:          0
         });
@@ -599,6 +605,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
             uint8    safeRevealed,
             uint8    totalSafe,
             GameStatus status,
+            uint256  startBlock,
             uint256  startedAt,
             uint256  endedAt
         )
@@ -616,6 +623,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
             g.safeRevealed,
             g.totalSafe,
             g.status,
+            g.startBlock,
             g.startedAt,
             g.endedAt
         );
@@ -761,7 +769,9 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
 
     /**
      * @notice Cancel a stuck game (player never made first flip, or VRF never
-     *         returned) after 24 h. Refunds the net bet; fee is non-refundable.
+     *         returned) after block-based thresholds. Refunds the net bet; fee is non-refundable.
+     *         WAITING_FIRST_FLIP: cancellable after 100 blocks (~3.3 min on Base).
+     *         WAITING_VRF: cancellable after 43200 blocks (~24h on Base).
      */
     function cancelStuckGame(uint256 gameId) external nonReentrant {
         Game storage g = games[gameId];
@@ -770,7 +780,13 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
             g.status == GameStatus.WAITING_VRF,
             "Not cancellable"
         );
-        require(block.timestamp > g.startedAt + 24 hours, "Too early");
+        uint256 requiredBlocks = g.status == GameStatus.WAITING_FIRST_FLIP
+            ? CANCEL_BLOCKS_WAITING_FIRST_FLIP
+            : CANCEL_BLOCKS_WAITING_VRF;
+        require(
+            block.number > g.startBlock + requiredBlocks,
+            "Cancel available after block threshold"
+        );
         require(msg.sender == g.player || msg.sender == owner(), "Not authorised");
 
         g.status  = GameStatus.CANCELLED;

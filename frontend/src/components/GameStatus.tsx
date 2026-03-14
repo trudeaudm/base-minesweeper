@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { formatEth, GameStatus, GRID_INFO, DIFF_INFO } from "@/lib/config";
 
 interface GameStatusProps {
@@ -15,8 +14,10 @@ interface GameStatusProps {
   isCashingOut:       boolean;
   isWaitingFirstFlip: boolean;
   isWaitingVRF:       boolean;
-  // Cancel-stuck-game props
-  vrfStartedAt:       number | null; // client-side ms timestamp when VRF started
+  // Block-based cancel: WAITING_FIRST_FLIP after 100 blocks, WAITING_VRF after 43200
+  blocksUntilCancel:  number;
+  canCancel:          boolean;
+  cancelThresholdBlocks: number;
   onCancelGame:       () => void;
   isCancelling:       boolean;
 }
@@ -35,7 +36,9 @@ export function GameStatusBar({
   isCashingOut,
   isWaitingFirstFlip,
   isWaitingVRF,
-  vrfStartedAt,
+  blocksUntilCancel,
+  canCancel,
+  cancelThresholdBlocks,
   onCancelGame,
   isCancelling,
 }: GameStatusProps) {
@@ -43,6 +46,7 @@ export function GameStatusBar({
   const diffInfo   = DIFF_INFO[difficulty as 0 | 1 | 2];
   const isActive   = status === GameStatus.ACTIVE;
   const canCashout = isActive && safeRevealed > 0;
+  const showCancelUI = isWaitingFirstFlip || isWaitingVRF;
 
   const progressPct = totalSafe > 0 ? (safeRevealed / totalSafe) * 100 : 0;
   const multiplierColor =
@@ -51,25 +55,6 @@ export function GameStatusBar({
       : multiplier >= 1.0
       ? "text-accent-yellow"
       : "text-white";
-
-  // ── VRF elapsed timer ────────────────────────────────────────────────────
-  // Tick every second while in WAITING_VRF so the cancel UI appears on time.
-  const [vrfElapsedSec, setVrfElapsedSec] = useState(0);
-
-  useEffect(() => {
-    if (!isWaitingVRF || vrfStartedAt === null) {
-      setVrfElapsedSec(0);
-      return;
-    }
-    const tick = () =>
-      setVrfElapsedSec(Math.floor((Date.now() - vrfStartedAt) / 1000));
-    tick();
-    const id = setInterval(tick, 1_000);
-    return () => clearInterval(id);
-  }, [isWaitingVRF, vrfStartedAt]);
-
-  const showSubtleCancel    = isWaitingVRF && vrfElapsedSec >= 60;   // 1 min
-  const showProminentCancel = isWaitingVRF && vrfElapsedSec >= 180;  // 3 min
 
   return (
     <div className="w-full max-w-xs mx-auto space-y-3">
@@ -137,52 +122,48 @@ export function GameStatusBar({
           <p className="text-xs text-white/40">
             Waiting for Chainlink VRF randomness
           </p>
-
-          {/* Subtle cancel hint after 1 minute */}
-          {showSubtleCancel && !showProminentCancel && (
-            <p className="text-xs text-white/40 mt-1">
-              Taking too long?{" "}
-              <button
-                onClick={onCancelGame}
-                disabled={isCancelling}
-                className="underline text-white/60 hover:text-white transition-colors disabled:opacity-50"
-              >
-                {isCancelling ? "Cancelling…" : "Cancel for a refund"}
-              </button>
-            </p>
-          )}
         </div>
       )}
 
-      {/* Prominent cancel button after 3 minutes */}
-      {showProminentCancel && (
+      {/* Block-based cancel: show countdown or button for WAITING_FIRST_FLIP / WAITING_VRF */}
+      {showCancelUI && (
         <div className="space-y-2">
-          <div className="px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-            <p className="text-xs text-yellow-400 text-center">
-              VRF is taking longer than expected. This may indicate a Chainlink
-              subscription issue. You can cancel and refund your ETH.
+          {blocksUntilCancel > 0 ? (
+            <p className="text-xs text-white/40 text-center">
+              Cancel available in <span className="font-mono text-white/60">{blocksUntilCancel}</span> blocks
+              {cancelThresholdBlocks === 43200 && " (~24h on Base)"}
             </p>
-          </div>
-          <button
-            onClick={onCancelGame}
-            disabled={isCancelling}
-            className={`
-              w-full py-3 rounded-xl font-bold text-sm transition-all duration-200
-              ${!isCancelling
-                ? "bg-yellow-600 hover:bg-yellow-500 text-white active:scale-95"
-                : "bg-white/10 text-white/30 cursor-not-allowed"
-              }
-            `}
-          >
-            {isCancelling ? (
-              <span className="inline-flex items-center justify-center gap-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Cancelling…
-              </span>
-            ) : (
-              "Cancel Game & Refund"
-            )}
-          </button>
+          ) : canCancel ? (
+            <>
+              {isWaitingVRF && (
+                <div className="px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <p className="text-xs text-yellow-400 text-center">
+                    VRF is taking longer than expected. You can cancel and refund your ETH.
+                  </p>
+                </div>
+              )}
+              <button
+                onClick={onCancelGame}
+                disabled={isCancelling}
+                className={`
+                  w-full py-3 rounded-xl font-bold text-sm transition-all duration-200
+                  ${!isCancelling
+                    ? "bg-yellow-600 hover:bg-yellow-500 text-white active:scale-95"
+                    : "bg-white/10 text-white/30 cursor-not-allowed"
+                  }
+                `}
+              >
+                {isCancelling ? (
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Cancelling…
+                  </span>
+                ) : (
+                  "Cancel Game & Refund"
+                )}
+              </button>
+            </>
+          ) : null}
         </div>
       )}
 

@@ -5,6 +5,7 @@ import {
   useWatchContractEvent,
   useAccount,
   usePublicClient,
+  useBlockNumber,
 } from "wagmi";
 import { parseEventLogs } from "viem";
 import { MINESWEEPER_ABI } from "@/abis/Minesweeper";
@@ -16,6 +17,8 @@ import {
   GameStatus,
   GRID_INFO,
   calcMultiplier,
+  CANCEL_BLOCKS_WAITING_FIRST_FLIP,
+  CANCEL_BLOCKS_WAITING_VRF,
 } from "@/lib/config";
 import {
   getOrCreateSessionKey,
@@ -46,6 +49,7 @@ export interface GameState {
   multiplier:          number;
   currentPayout:       bigint;
   sessionKeyAddr:      `0x${string}` | null;
+  startBlock:          bigint; // block number when startGame() was called
   startedAt:           bigint; // Unix timestamp (seconds) when game was created
   isWaitingFirstFlip:  boolean; // board shown, waiting for player's first click
   isWaitingVRF:        boolean; // first click made, VRF in-flight
@@ -69,6 +73,7 @@ const EMPTY_STATE: GameState = {
   multiplier:         0,
   currentPayout:      0n,
   sessionKeyAddr:     null,
+  startBlock:         0n,
   startedAt:          0n,
   isWaitingFirstFlip: false,
   isWaitingVRF:       false,
@@ -147,9 +152,9 @@ export function useGame() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError]             = useState<string | null>(null);
   const sessionAcc = useRef(getOrCreateSessionKey());
-  // Tracks the client-side timestamp (ms) when we first observed WAITING_VRF,
-  // so the UI can compute how long VRF has been in-flight.
-  const vrfEnteredAtRef = useRef<number | null>(null);
+
+  // ── Current block number (for block-based cancel countdown) ───────────────
+  const { data: currentBlock = 0n } = useBlockNumber({ watch: true });
 
   // ── Read active game for player ──────────────────────────────────────────
   const { data: activeGameId, refetch: refetchActiveGame } = useReadContract({
@@ -189,17 +194,10 @@ export function useGame() {
     const [
       , sessionKey, gridSize, difficulty, entryFee,
       maxPayout, mineBitmask, revealedBitmask,
-      safeRevealed, totalSafe, statusNum, startedAt,
+      safeRevealed, totalSafe, statusNum, startBlock, startedAt,
     ] = rawGame;
 
     const status     = statusNum as GameStatus;
-
-    // Track when VRF started on the client side (for timeout UI)
-    if (status === GameStatus.WAITING_VRF) {
-      if (vrfEnteredAtRef.current === null) vrfEnteredAtRef.current = Date.now();
-    } else {
-      vrfEnteredAtRef.current = null;
-    }
     const totalTiles = GRID_INFO[gridSize as 0|1|2].totalTiles;
     const isHard     = difficulty === 2;
     const mult       = calcMultiplier(safeRevealed, totalSafe, isHard);
@@ -229,6 +227,7 @@ export function useGame() {
       sessionKeyAddr: sessionKey !== "0x0000000000000000000000000000000000000000"
         ? sessionKey as `0x${string}`
         : null,
+      startBlock:     typeof startBlock === "bigint" ? startBlock : BigInt(Number(startBlock)),
       startedAt,
       isWaitingFirstFlip: status === GameStatus.WAITING_FIRST_FLIP,
       isWaitingVRF:       status === GameStatus.WAITING_VRF,
@@ -420,9 +419,7 @@ export function useGame() {
   // ─────────────────────────────────────────────────────────────────────────
   // Cancel Stuck Game  (requires connected wallet – only player or owner)
   //
-  // The contract allows cancellation in WAITING_FIRST_FLIP or WAITING_VRF
-  // after 24 hours. This sends the tx via the player's connected wallet and
-  // clears local state on success.  Returns true on success, false on error.
+  // Block-based: WAITING_FIRST_FLIP after 100 blocks, WAITING_VRF after 43200.
   // ─────────────────────────────────────────────────────────────────────────
   const cancelGame = useCallback(async (): Promise<boolean> => {
     if (!gameState.gameId) return false;
@@ -439,7 +436,6 @@ export function useGame() {
         await publicClient.waitForTransactionReceipt({ hash });
       }
       clearSessionKey();
-      vrfEnteredAtRef.current = null;
       setGameState(EMPTY_STATE);
       setError(null);
       await refetchActiveGame();
@@ -457,9 +453,17 @@ export function useGame() {
     setGameState(EMPTY_STATE);
     setError(null);
     clearSessionKey();
-    vrfEnteredAtRef.current = null;
     refetchActiveGame();
   }, [refetchActiveGame]);
+
+  // ── Block-based cancel eligibility ──────────────────────────────────────
+  const cancelThresholdBlocks =
+    gameState.isWaitingFirstFlip ? CANCEL_BLOCKS_WAITING_FIRST_FLIP : CANCEL_BLOCKS_WAITING_VRF;
+  const cancelBlock = gameState.startBlock + BigInt(cancelThresholdBlocks);
+  const canCancel = currentBlock > 0n && cancelBlock > 0n && currentBlock > cancelBlock;
+  const blocksUntilCancel = currentBlock > 0n && cancelBlock > currentBlock
+    ? Number(cancelBlock - currentBlock)
+    : 0;
 
   return {
     gameState,
@@ -469,7 +473,11 @@ export function useGame() {
     pendingTile,
     error,
     sessionKeyAddr: sessionAcc.current.address,
-    vrfStartedAt:  vrfEnteredAtRef.current,
+    currentBlock:   currentBlock,
+    startBlock:      gameState.startBlock,
+    blocksUntilCancel,
+    canCancel,
+    cancelThresholdBlocks,
     startGame,
     flipTile,
     cashOut,

@@ -21,6 +21,7 @@ export const RELAYER_ABI = [
       { name: "safeRevealed",    type: "uint8"   },
       { name: "totalSafe",       type: "uint8"   },
       { name: "status",          type: "uint8"   },
+      { name: "startBlock",      type: "uint256" },
       { name: "startedAt",       type: "uint256" },
       { name: "endedAt",         type: "uint256" },
     ],

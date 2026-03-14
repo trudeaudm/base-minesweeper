@@ -20,7 +20,9 @@ function GameApp() {
     isCashingOut,
     isCancelling,
     error,
-    vrfStartedAt,
+    blocksUntilCancel,
+    canCancel,
+    cancelThresholdBlocks,
     startGame,
     flipTile,
     cashOut,
@@ -102,7 +104,9 @@ function GameApp() {
               isCashingOut={isCashingOut}
               isWaitingFirstFlip={gameState.isWaitingFirstFlip}
               isWaitingVRF={gameState.isWaitingVRF}
-              vrfStartedAt={vrfStartedAt}
+              blocksUntilCancel={blocksUntilCancel}
+              canCancel={canCancel}
+              cancelThresholdBlocks={cancelThresholdBlocks}
               onCancelGame={handleCancelGame}
               isCancelling={isCancelling}
             />

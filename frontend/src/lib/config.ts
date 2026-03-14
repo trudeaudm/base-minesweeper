@@ -87,6 +87,10 @@ export const MAX_PAYOUT_BPS_NORMAL = 19000n; // 1.90×
 export const MAX_PAYOUT_BPS_HARD   = 19500n; // 1.95×
 export const BPS_DENOMINATOR       = 10000n;
 
+// Block-based cancellation thresholds (must match Minesweeper.sol)
+export const CANCEL_BLOCKS_WAITING_FIRST_FLIP = 100;   // ~3.3 min on Base
+export const CANCEL_BLOCKS_WAITING_VRF        = 43200; // ~24h on Base
+
 /** Calculate payout multiplier string for display (0 → "0.00×", full → "1.90×") */
 export function calcMultiplier(
   safeRevealed: number,
