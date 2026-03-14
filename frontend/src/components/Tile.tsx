@@ -203,7 +203,7 @@ export function Tile({
         border border-blue-400/25
         shadow-tile
         ${disabled
-          ? `cursor-not-allowed bg-base-blue ${isWaitingVRF ? "" : "opacity-60"}`
+          ? "cursor-not-allowed bg-base-blue opacity-60"
           : "cursor-pointer bg-base-blue hover:bg-blue-500 active:scale-95 hover:shadow-cashout transition-colors duration-150"
         }
         ${isShaking ? "animate-tile-shake" : ""}

@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Tile } from "./Tile";
-import { BaseCircleLogo } from "./BaseLogo";
 import { type TileState } from "@/hooks/useGame";
 import { GameStatus, GRID_INFO } from "@/lib/config";
 
@@ -69,9 +68,6 @@ function adjacentMineCount(
   }
   return count;
 }
-
-const VRF_BOUNCE_COUNT = 6;
-const VRF_BOUNCE_MS = 380;
 
 const TILE_SHAKE_INTERVAL_MS = 2600;
 const TILE_SHAKE_COUNT = 3;
@@ -214,46 +210,6 @@ export function GameBoard({
     return () => clearInterval(id);
   }, [active, isWaitingVRF, isGameOver]);
 
-  // Pseudo-random bounce sequence: 5–8 unrevealed tile indices, stable for this VRF wait.
-  const bounceSequence = useMemo(() => {
-    if (!isWaitingVRF) return [];
-    const unrevealed = tileStates
-      .map((s, i) => i)
-      .filter((i) => tileStates[i] === "unrevealed");
-    const count = Math.max(5, Math.min(8, unrevealed.length));
-    const shuffled = shuffleWithSeed(unrevealed, Date.now());
-    return shuffled.slice(0, count);
-  }, [isWaitingVRF]); // eslint-disable-line react-hooks/exhaustive-deps -- freeze sequence when VRF starts
-
-  const [bounceStep, setBounceStep] = useState(0);
-
-  useEffect(() => {
-    if (!isWaitingVRF || bounceSequence.length === 0) {
-      setBounceStep(0);
-      return;
-    }
-    setBounceStep(0);
-    const id = setInterval(() => {
-      setBounceStep((prev) => (prev < bounceSequence.length - 1 ? prev + 1 : prev));
-    }, VRF_BOUNCE_MS);
-    return () => clearInterval(id);
-  }, [isWaitingVRF, bounceSequence.length]);
-
-  const currentBounceTileIndex =
-    isWaitingVRF && bounceSequence.length > 0
-      ? bounceSequence[bounceStep] ?? bounceSequence[0]
-      : -1;
-
-  const { cols, rows } = info;
-  const logoLeftPct =
-    currentBounceTileIndex >= 0
-      ? ((currentBounceTileIndex % cols) + 0.5) / cols * 100
-      : 50;
-  const logoTopPct =
-    currentBounceTileIndex >= 0
-      ? (Math.floor(currentBounceTileIndex / cols) + 0.5) / rows * 100
-      : 50;
-
   return (
     <div
       className={`w-full max-w-xs mx-auto relative ${screenShake ? "animate-screen-shake" : ""}`}
@@ -281,7 +237,7 @@ export function GameBoard({
               disabled={!active || state !== "unrevealed" || isFlipPending}
               isCashout={isCashout && active}
               isWaitingVRF={isWaitingVRF && state === "unrevealed"}
-              isHighlighted={currentBounceTileIndex === i}
+              isHighlighted={false}
               isGameOver={isGameOver && state === "unrevealed"}
               isWinReveal={isWinReveal && state === "unrevealed"}
               explosionPhase={getExplosionPhase(i)}
@@ -292,25 +248,6 @@ export function GameBoard({
           );
         })}
       </div>
-
-      {/* VRF waiting: bouncing Base circle logo with spinning bar */}
-      {isWaitingVRF && bounceSequence.length > 0 && (
-        <div
-          className="absolute inset-0 pointer-events-none"
-          aria-hidden
-        >
-          <div
-            className="absolute w-7 h-7 transition-all duration-300 ease-out"
-            style={{
-              left: `${logoLeftPct}%`,
-              top: `${logoTopPct}%`,
-              transform: "translate(-50%, -50%)",
-            }}
-          >
-            <BaseCircleLogo size={28} spinBar />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

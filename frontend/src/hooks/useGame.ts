@@ -517,8 +517,12 @@ export function useGame() {
       return;
     }
 
-    // ACTIVE: add to batch and start/reset delay timer
-    setPendingTiles((prev) => (prev.includes(tileIndex) ? prev : [...prev, tileIndex]));
+    // ACTIVE: add to batch and start/reset delay timer (ref updated in updater so isFlipPending stays false this tick)
+    setPendingTiles((prev) => {
+      const next = prev.includes(tileIndex) ? prev : [...prev, tileIndex];
+      pendingTilesRef.current = next;
+      return next;
+    });
     if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
     batchTimerRef.current = setTimeout(() => {
       flushBatch();
@@ -669,6 +673,11 @@ export function useGame() {
     setBurstRevealOrder([]);
   }, []);
 
+  // Grey only when a flip tx is in flight; never grey during 50ms batch collection (use ref so same-tick click doesn't grey)
+  const isFlipPending =
+    (pendingTile !== null || isFlipInFlight) &&
+    !(gameState.isActive && (pendingTiles.length > 0 || pendingTilesRef.current.length > 0));
+
   return {
     gameState,
     isStarting,
@@ -676,6 +685,7 @@ export function useGame() {
     isCancelling,
     pendingTile,
     pendingTiles,
+    isFlipPending,
     isFlipInFlight,
     burstRevealOrder,
     onBurstRevealComplete,
