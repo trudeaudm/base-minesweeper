@@ -158,16 +158,13 @@ async function main() {
     console.log("Contract balance:  ", ethers.formatEther(contractBalance), "ETH");
     console.log("Owner balance:     ", ethers.formatEther(ownerBefore), "ETH");
 
-    const safeFloor = await contract.safeReserveFloor();
-    const withdrawablePool = pool > safeFloor ? pool - safeFloor : 0n;
-
-    if (withdrawablePool > 0n) {
-      console.log("\nWithdrawing pool profits:", ethers.formatEther(withdrawablePool), "ETH");
-      const tx1 = await contract.withdrawPoolProfits(withdrawablePool);
+    if (pool > 0n) {
+      console.log("\nWithdrawing 100% of pool to owner:", ethers.formatEther(pool), "ETH");
+      const tx1 = await contract.withdraw(0, ethers.ZeroAddress); // 0 => 100%, zero => owner
       await tx1.wait();
       console.log("  tx:", tx1.hash);
     } else {
-      console.log("\nNo withdrawable pool profits (pool <= safe reserve floor)");
+      console.log("\nPool is empty, nothing to withdraw");
     }
     if (fees > 0n) {
       console.log("Withdrawing fees:", ethers.formatEther(fees), "ETH");

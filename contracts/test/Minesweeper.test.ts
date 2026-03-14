@@ -769,29 +769,25 @@ describe("Minesweeper", () => {
       expect(cfg.maxConcurrent).to.equal(100);
     });
 
-    it("withdrawPoolProfits respects safe floor", async () => {
-      const { minesweeper, owner } = await loadFixture(deployFixture);
-      const floor = await minesweeper.safeReserveFloor();
-      const pool  = await minesweeper.poolBalance();
-      const excess = pool - floor + 1n;
-      if (excess > 0n) {
-        await expect(
-          minesweeper.connect(owner).withdrawPoolProfits(excess)
-        ).to.be.revertedWith("Would breach safe floor");
-      }
-    });
-
-    it("withdrawPoolProfits succeeds within safe floor", async () => {
+    it("withdraw(percentBps, recipient) withdraws share to recipient", async () => {
       const { minesweeper, owner } = await loadFixture(deployFixture);
       await minesweeper.connect(owner).depositPool({ value: ethers.parseEther("100") });
-      const floor  = await minesweeper.safeReserveFloor();
-      const pool   = await minesweeper.poolBalance();
-      const profit = pool - floor;
-      if (profit > 0n) {
-        await expect(
-          minesweeper.connect(owner).withdrawPoolProfits(profit)
-        ).to.emit(minesweeper, "ProfitWithdrawn");
-      }
+      const poolBefore = await minesweeper.poolBalance();
+      const expectedAmount = (poolBefore * 5000n) / 10000n;
+      await expect(
+        minesweeper.connect(owner).withdraw(5000, owner.address) // 50%
+      )
+        .to.emit(minesweeper, "Withdrawn")
+        .withArgs(owner.address, expectedAmount, 5000n);
+      expect(await minesweeper.poolBalance()).to.equal(poolBefore - expectedAmount);
+    });
+
+    it("withdraw(0, zero) defaults to 100% to owner", async () => {
+      const { minesweeper, owner } = await loadFixture(deployFixture);
+      await minesweeper.connect(owner).depositPool({ value: ethers.parseEther("10") });
+      await minesweeper.connect(owner).withdraw(0, ethers.ZeroAddress);
+      expect(await minesweeper.poolBalance()).to.equal(0n);
+      await expect(minesweeper.connect(owner).withdraw(0, ethers.ZeroAddress)).not.to.be.reverted; // no-op when 0
     });
   });
 

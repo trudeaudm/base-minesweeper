@@ -132,7 +132,7 @@ setMaxConcurrentGames(gridSize, max)
 setMinPoolThreshold(gridSize, amount)
 depositPool()
 withdrawFees()
-withdrawPoolProfits(amount)
+withdraw(percentBps, recipient)
 ```
 
 ## License

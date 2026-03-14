@@ -178,7 +178,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         uint64   mineBitmask
     );
     event FeeWithdrawn(address indexed owner, uint256 amount);
-    event ProfitWithdrawn(address indexed owner, uint256 amount);
+    event Withdrawn(address indexed recipient, uint256 amount, uint256 percentBps);
     event PoolDeposited(address indexed sender, uint256 amount);
     event SessionKeySet(uint256 indexed gameId, address indexed sessionKey);
     event VRFConfigUpdated(bytes32 keyHash, uint256 subscriptionId, uint32 callbackGasLimit);
@@ -722,30 +722,20 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         emit FeeWithdrawn(owner(), amount);
     }
 
-    function withdrawPoolProfits(uint256 amount) external onlyOwner nonReentrant {
-        require(amount > 0, "Zero amount");
-        uint256 safeFloor = _safeReserveFloor();
-        require(
-            poolBalance >= amount + safeFloor,
-            "Would breach safe floor"
-        );
+    /**
+     * @notice Withdraw a percentage of pool balance to a recipient.
+     * @param percentBps Percentage in basis points (10000 = 100%). If 0, treated as 10000.
+     * @param recipient Address to send ETH to. If zero, uses owner().
+     */
+    function withdraw(uint256 percentBps, address recipient) external onlyOwner nonReentrant {
+        if (percentBps == 0) percentBps = 10000;
+        if (recipient == address(0)) recipient = owner();
+        uint256 amount = (poolBalance * percentBps) / 10000;
+        if (amount == 0) return;
         poolBalance -= amount;
-        (bool ok, ) = owner().call{value: amount}("");
+        (bool ok, ) = recipient.call{value: amount}("");
         require(ok, "Transfer failed");
-        emit ProfitWithdrawn(owner(), amount);
-    }
-
-    function _safeReserveFloor() internal view returns (uint256 floor) {
-        uint8[3] memory grids = [GRID_SMALL, GRID_MEDIUM, GRID_LARGE];
-        for (uint256 i = 0; i < grids.length; i++) {
-            GridConfig storage cfg = gridConfigs[grids[i]];
-            uint256 worstPayout = (cfg.entryFee * MAX_PAYOUT_BPS_HARD) / BPS_DENOMINATOR;
-            floor += worstPayout * cfg.maxConcurrent;
-        }
-    }
-
-    function safeReserveFloor() external view returns (uint256) {
-        return _safeReserveFloor();
+        emit Withdrawn(recipient, amount, percentBps);
     }
 
     // ─────────────────────────────────────────────

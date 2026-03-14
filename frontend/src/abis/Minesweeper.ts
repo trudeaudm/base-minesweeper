@@ -73,10 +73,11 @@ export const MINESWEEPER_ABI = [
   },
   {
     type: "event",
-    name: "ProfitWithdrawn",
+    name: "Withdrawn",
     inputs: [
-      { indexed: true,  name: "owner",  type: "address" },
-      { indexed: false, name: "amount", type: "uint256" },
+      { indexed: true,  name: "recipient", type: "address" },
+      { indexed: false, name: "amount",    type: "uint256" },
+      { indexed: false, name: "percentBps", type: "uint256" },
     ],
   },
   // ── Write Functions ──────────────────────────────────────────
@@ -151,9 +152,12 @@ export const MINESWEEPER_ABI = [
   },
   {
     type: "function",
-    name: "withdrawPoolProfits",
+    name: "withdraw",
     stateMutability: "nonpayable",
-    inputs: [{ name: "amount", type: "uint256" }],
+    inputs: [
+      { name: "percentBps", type: "uint256" },
+      { name: "recipient",  type: "address" },
+    ],
     outputs: [],
   },
   // ── Admin Functions ──────────────────────────────────────────
@@ -267,13 +271,6 @@ export const MINESWEEPER_ABI = [
       { name: "fees",            type: "uint256" },
       { name: "contractBalance", type: "uint256" },
     ],
-  },
-  {
-    type: "function",
-    name: "safeReserveFloor",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "uint256" }],
   },
   {
     type: "function",

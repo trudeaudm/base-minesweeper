@@ -56,12 +56,6 @@ export function AdminPage() {
     query: { refetchInterval: 30_000 },
   });
 
-  const { data: safeFloor } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: MINESWEEPER_ABI,
-    functionName: "safeReserveFloor",
-  });
-
   const { data: ownerBalanceData } = useBalance({
     address: isOwner ? connectedAddress! : undefined,
     query: { refetchInterval: 30_000 },
@@ -72,13 +66,12 @@ export function AdminPage() {
   const reserved = poolHealth?.[1] ?? 0n;
   const fees = poolHealth?.[2] ?? 0n;
   const contractBalance = poolHealth?.[3] ?? 0n;
-  const floor = safeFloor ?? 0n;
-  const maxWithdrawable = pool > floor ? pool - floor : 0n;
 
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
 
   const [depositAmount, setDepositAmount] = useState("");
-  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawPercent, setWithdrawPercent] = useState("");
+  const [withdrawRecipient, setWithdrawRecipient] = useState("");
   const [stuckGames, setStuckGames] = useState<StuckGame[]>([]);
   const [cancellingId, setCancellingId] = useState<bigint | null>(null);
   const [txMessage, setTxMessage] = useState<string | null>(null);
@@ -94,12 +87,6 @@ export function AdminPage() {
     const eth = Number(wei) / 1e18;
     return eth.toFixed(6);
   }
-
-  useEffect(() => {
-    if (maxWithdrawable > 0n && !withdrawAmount) {
-      setWithdrawAmount(weiToInputString(maxWithdrawable));
-    }
-  }, [maxWithdrawable, withdrawAmount]);
 
   useEffect(() => {
     if (!nextGameId || nextGameId <= 1n || !publicClient) {
@@ -172,24 +159,23 @@ export function AdminPage() {
     }
   };
 
-  const handleWithdrawProfits = async () => {
-    let wei: bigint;
-    try {
-      wei = parseEther(withdrawAmount);
-    } catch {
-      return;
-    }
-    if (wei <= 0n || wei > maxWithdrawable) return;
+  const handleWithdraw = async () => {
+    const pct = withdrawPercent.trim() === "" ? 100 : Number(withdrawPercent);
+    if (Number.isNaN(pct) || pct < 0 || pct > 100) return;
+    const percentBps = BigInt(Math.round(pct * 100)); // 0–100 → 0–10000 bps
+    const recipient = withdrawRecipient.trim()
+      ? (withdrawRecipient as `0x${string}`)
+      : "0x0000000000000000000000000000000000000000" as `0x${string}`;
     setTxMessage(null);
     try {
       const hash = await writeContractAsync({
         address: CONTRACT_ADDRESS,
         abi: MINESWEEPER_ABI,
-        functionName: "withdrawPoolProfits",
-        args: [wei],
+        functionName: "withdraw",
+        args: [percentBps, recipient],
       });
       if (publicClient) await publicClient.waitForTransactionReceipt({ hash });
-      setTxMessage(`Withdrew ${formatEth(wei)} ETH`);
+      setTxMessage(`Withdrew ${pct}% of pool${recipient === "0x0000000000000000000000000000000000000000" ? " to owner" : ""}`);
       refetchPoolHealth();
     } catch (e) {
       setTxMessage(e instanceof Error ? e.message : "Withdraw failed");
@@ -308,27 +294,31 @@ export function AdminPage() {
             <p className="text-xs text-gray-500 mt-2">Current pool: {formatEth(pool)} ETH (updates after confirm)</p>
           </section>
 
-          {/* 3. Withdraw Pool Profits */}
+          {/* 3. Withdraw Pool */}
           <section className="border border-gray-200 rounded-[4px] p-4">
-            <h2 className="text-lg font-semibold text-[#111111] mb-3">Withdraw Pool Profits</h2>
-            <p className="text-sm text-gray-600 mb-2">Max withdrawable: {formatEth(maxWithdrawable)} ETH</p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="0.0"
-                value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-[4px] font-mono text-sm"
-              />
+            <h2 className="text-lg font-semibold text-[#111111] mb-3">Withdraw Pool</h2>
+            <p className="text-sm text-gray-600 mb-2">Pool: {formatEth(pool)} ETH. Percent 0–100 (empty = 100%). Optional recipient (empty = owner).</p>
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  placeholder="100"
+                  value={withdrawPercent}
+                  onChange={(e) => setWithdrawPercent(e.target.value)}
+                  className="w-20 px-3 py-2 border border-gray-200 rounded-[4px] font-mono text-sm"
+                />
+                <span className="text-sm text-gray-600">%</span>
+                <input
+                  type="text"
+                  placeholder="Recipient (optional)"
+                  value={withdrawRecipient}
+                  onChange={(e) => setWithdrawRecipient(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-[4px] font-mono text-sm"
+                />
+              </div>
               <button
-                onClick={() => setWithdrawAmount(weiToInputString(maxWithdrawable))}
-                className="px-2 py-2 text-gray-500 text-sm"
-              >
-                Max
-              </button>
-              <button
-                onClick={handleWithdrawProfits}
-                disabled={isWritePending || !withdrawAmount || maxWithdrawable <= 0n}
+                onClick={handleWithdraw}
+                disabled={isWritePending || pool <= 0n}
                 className="px-4 py-2 bg-base-blue text-white rounded-[4px] font-medium text-sm disabled:opacity-50"
               >
                 Withdraw
