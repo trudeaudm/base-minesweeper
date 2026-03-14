@@ -426,7 +426,8 @@ export function useGame() {
   }, [publicClient, playerAddress, refetchGame, writeContractAsync]);
 
   const flipTile = useCallback((tileIndex: number) => {
-    if (!gameState.gameId) return;
+    const gameId = gameState.gameId;
+    if (!gameId) return;
     const isFirstFlip = gameState.isWaitingFirstFlip;
     if (!isFirstFlip && !gameState.isActive) return;
     if (gameState.tileStates[tileIndex] !== "unrevealed") return;
@@ -444,7 +445,7 @@ export function useGame() {
               address:      CONTRACT_ADDRESS,
               abi:          MINESWEEPER_ABI,
               functionName: fnName,
-              args:         [gameState.gameId, tileIndex],
+              args:         [gameId, tileIndex],
             });
             await publicClient?.waitForTransactionReceipt({ hash });
           } else {
@@ -452,16 +453,16 @@ export function useGame() {
               address:      CONTRACT_ADDRESS,
               abi:          MINESWEEPER_ABI,
               functionName: fnName,
-              args:         [gameState.gameId, tileIndex],
+              args:         [gameId, tileIndex],
             });
           }
           await refetchGame();
-          if (publicClient && gameState.gameId) {
+          if (publicClient) {
             const raw = await publicClient.readContract({
               address: CONTRACT_ADDRESS,
               abi:     MINESWEEPER_ABI,
               functionName: "getGame",
-              args:    [gameState.gameId],
+              args:    [gameId],
             });
             const status = Number((raw as readonly unknown[])[10]);
             if (status === GameStatus.CASHED_OUT || status === GameStatus.GAME_OVER) {
