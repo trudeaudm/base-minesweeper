@@ -43,10 +43,13 @@ export function GameBoard({
   onFlip,
   isCashout = false,
 }: GameBoardProps) {
-  const info   = GRID_INFO[gridSize as 0 | 1 | 2];
-  // Tiles are clickable in WAITING_FIRST_FLIP (player picks opening tile)
-  // and in ACTIVE (regular gameplay).
-  const active = status === GameStatus.ACTIVE || status === GameStatus.WAITING_FIRST_FLIP;
+  const info = GRID_INFO[gridSize as 0 | 1 | 2];
+
+  // Tiles are clickable in WAITING_FIRST_FLIP and ACTIVE states.
+  const active       = status === GameStatus.ACTIVE || status === GameStatus.WAITING_FIRST_FLIP;
+  const isWaitingVRF = status === GameStatus.WAITING_VRF;
+  const isGameOver   = status === GameStatus.GAME_OVER;
+  const isWinReveal  = status === GameStatus.CASHED_OUT;
 
   return (
     <div
@@ -62,6 +65,7 @@ export function GameBoard({
           <Tile
             key={i}
             index={i}
+            cols={info.cols}
             state={state}
             adjacentCount={
               state === "safe"
@@ -71,6 +75,9 @@ export function GameBoard({
             onClick={onFlip}
             disabled={!active || state !== "unrevealed"}
             isCashout={isCashout && active}
+            isWaitingVRF={isWaitingVRF && state === "unrevealed"}
+            isGameOver={isGameOver && state === "unrevealed"}
+            isWinReveal={isWinReveal && state === "unrevealed"}
           />
         ))}
       </div>

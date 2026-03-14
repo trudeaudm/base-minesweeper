@@ -13,7 +13,9 @@ export function GameOverScreen({ entryFee, gridSize, difficulty, onPlayAgain }: 
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setShow(true), 50);
+    // Delay the overlay so the mine-reveal flash and safe-tile fade animations
+    // are visible on the board before it's covered (~400 ms).
+    const t = setTimeout(() => setShow(true), 400);
     return () => clearTimeout(t);
   }, []);
 

@@ -3,33 +3,41 @@ import { BaseMineIcon } from "./BaseLogo";
 
 interface TileProps {
   index:          number;
+  cols:           number;
   state:          TileState;
   adjacentCount?: number;
   onClick:        (index: number) => void;
   disabled:       boolean;
-  isCashout?:     boolean; // pulsing cashout state
+  isCashout?:     boolean;  // pulse hint: player can cash out
+  isWaitingVRF?:  boolean;  // wave animation during VRF wait
+  isGameOver?:    boolean;  // fade unrevealed tiles to dark on loss
+  isWinReveal?:   boolean;  // flip unrevealed tiles to white on win
 }
 
-// Classic minesweeper number colors
+// Classic minesweeper number colors — tuned for light (white) tile background
 const NUMBER_COLORS = [
-  "",              // 0 — blank
-  "text-blue-400", // 1
-  "text-green-400",// 2
-  "text-red-400",  // 3
-  "text-blue-700", // 4
-  "text-red-700",  // 5
-  "text-cyan-400", // 6
-  "text-black",    // 7
-  "text-gray-400", // 8
+  "",                 // 0 — blank
+  "text-blue-600",    // 1
+  "text-green-700",   // 2
+  "text-red-500",     // 3
+  "text-indigo-800",  // 4
+  "text-red-800",     // 5
+  "text-teal-600",    // 6
+  "text-gray-900",    // 7
+  "text-gray-500",    // 8
 ];
 
 export function Tile({
   index,
+  cols,
   state,
   adjacentCount,
   onClick,
   disabled,
-  isCashout = false,
+  isCashout      = false,
+  isWaitingVRF   = false,
+  isGameOver     = false,
+  isWinReveal    = false,
 }: TileProps) {
   const handleClick = () => {
     if (!disabled && state === "unrevealed") {
@@ -37,44 +45,63 @@ export function Tile({
     }
   };
 
-  // ── Style by state ────────────────────────────────────────────────────────
+  const col = index % cols;
+  const row = Math.floor(index / cols);
+
+  // VRF wave: negative delay so each tile is already mid-wave at different phases,
+  // creating the continuous left-to-right sweep effect.
+  const vrfDelay = `-${(col * 80 + row * 20) % 1800}ms`;
+
+  // Win / game-over reveals stagger left-to-right, top-to-bottom.
+  const revealDelay = `${col * 55 + row * 35}ms`;
+
+  // Game-over unrevealed tiles start fading after the mine flash peaks (~200 ms).
+  const fadeDelay = `${200 + col * 18 + row * 12}ms`;
+
+  // ── Mine ─────────────────────────────────────────────────────────────────
   if (state === "mine") {
     return (
-      <div
-        className="
-          relative flex items-center justify-center
-          rounded-md w-full aspect-square
-          bg-mine shadow-tile-mine
-          animate-mine-reveal cursor-default
-          border border-red-300/30
-        "
-      >
-        <BaseMineIcon size={24} />
+      <div style={{ perspective: "600px" }}>
+        <div
+          className="
+            relative flex items-center justify-center
+            rounded-md w-full aspect-square
+            bg-mine shadow-tile-mine
+            animate-mine-reveal cursor-default
+            border border-red-300/30
+          "
+        >
+          <BaseMineIcon size={24} />
+        </div>
       </div>
     );
   }
 
+  // ── Safe (revealed) ──────────────────────────────────────────────────────
   if (state === "safe") {
     const n = adjacentCount ?? 0;
     return (
-      <div
-        className="
-          relative flex items-center justify-center
-          rounded-md w-full aspect-square
-          bg-neutral-800 border border-white/10
-          shadow-tile-safe cursor-default
-          animate-tile-flip
-        "
-      >
-        {n > 0 && (
-          <span className={`text-xs font-bold font-mono select-none ${NUMBER_COLORS[n]}`}>
-            {n}
-          </span>
-        )}
+      <div style={{ perspective: "600px" }}>
+        <div
+          className="
+            relative flex items-center justify-center
+            rounded-md w-full aspect-square
+            bg-neutral-100 border border-neutral-300/60
+            shadow-tile-safe cursor-default
+            animate-tile-flip
+          "
+        >
+          {n > 0 && (
+            <span className={`text-xs font-bold font-mono select-none ${NUMBER_COLORS[n]}`}>
+              {n}
+            </span>
+          )}
+        </div>
       </div>
     );
   }
 
+  // ── Pending (first-flip in flight) ───────────────────────────────────────
   if (state === "pending") {
     return (
       <div
@@ -90,7 +117,29 @@ export function Tile({
     );
   }
 
-  // unrevealed
+  // ── Unrevealed — win wave (flip all to white) ────────────────────────────
+  if (isWinReveal) {
+    return (
+      <div style={{ perspective: "600px" }}>
+        <div
+          className="rounded-md w-full aspect-square bg-base-blue animate-win-tile"
+          style={{ animationDelay: revealDelay }}
+        />
+      </div>
+    );
+  }
+
+  // ── Unrevealed — game-over fade ───────────────────────────────────────────
+  if (isGameOver) {
+    return (
+      <div
+        className="rounded-md w-full aspect-square bg-base-blue animate-game-over-fade"
+        style={{ animationDelay: fadeDelay }}
+      />
+    );
+  }
+
+  // ── Unrevealed — interactive ──────────────────────────────────────────────
   return (
     <button
       onClick={handleClick}
@@ -98,15 +147,16 @@ export function Tile({
       className={`
         relative flex items-center justify-center
         rounded-md w-full aspect-square
-        transition-all duration-150
         border border-blue-400/20
         shadow-tile
         ${disabled
-          ? "cursor-not-allowed opacity-60 bg-base-blue"
-          : "cursor-pointer bg-base-blue hover:bg-blue-500 active:scale-95 hover:shadow-cashout"
+          ? `cursor-not-allowed bg-base-blue ${isWaitingVRF ? "" : "opacity-60"}`
+          : "cursor-pointer bg-base-blue hover:bg-blue-500 active:scale-95 hover:shadow-cashout transition-colors duration-150"
         }
-        ${isCashout && !disabled ? "animate-pulse-slow" : ""}
+        ${isWaitingVRF                          ? "animate-vrf-wave"   : ""}
+        ${isCashout && !disabled && !isWaitingVRF ? "animate-pulse-slow" : ""}
       `}
+      style={isWaitingVRF ? { animationDelay: vrfDelay } : undefined}
       aria-label={`Tile ${index}`}
     />
   );

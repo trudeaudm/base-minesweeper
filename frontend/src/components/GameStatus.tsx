@@ -186,18 +186,23 @@ export function GameStatusBar({
         </div>
       )}
 
-      {/* Cash Out button */}
+      {/* Cash Out button — pulse speed + glow intensity scale with multiplier */}
       {isActive && !isWaitingVRF && (
         <button
           onClick={onCashOut}
           disabled={!canCashout || isCashingOut}
           className={`
-            w-full py-3.5 rounded-xl font-bold text-lg transition-all duration-200
+            w-full py-3.5 rounded-xl font-bold text-lg transition-colors duration-200
             ${canCashout && !isCashingOut
-              ? "bg-base-blue hover:bg-blue-500 text-white shadow-cashout animate-pulse-slow active:scale-95"
+              ? "bg-base-blue hover:bg-blue-500 text-white animate-cashout-glow active:scale-95"
               : "bg-white/10 text-white/30 cursor-not-allowed"
             }
           `}
+          style={canCashout && !isCashingOut ? {
+            // Faster pulse + stronger glow as multiplier climbs
+            animationDuration: `${Math.max(0.55, 2.2 - (multiplier - 1.0) * 2.2).toFixed(2)}s`,
+            boxShadow: `0 0 ${Math.round(Math.min(52, 12 + (multiplier - 1.0) * 44))}px rgba(0,82,255,${Math.min(0.9, 0.38 + (multiplier - 1.0) * 0.55).toFixed(2)})`,
+          } : undefined}
         >
           {isCashingOut ? (
             <span className="inline-flex items-center gap-2">
