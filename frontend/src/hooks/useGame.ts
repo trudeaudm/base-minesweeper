@@ -22,6 +22,7 @@ import {
 } from "@/lib/config";
 import {
   getOrCreateSessionKey,
+  getSessionKey,
   clearSessionKey,
   createSessionWalletClient,
 } from "@/lib/session";
@@ -95,6 +96,53 @@ function buildTileStates(
     const isMine = ((mineBitmask >> BigInt(i)) & 1n) === 1n;
     return isMine ? "mine" : "safe";
   });
+}
+
+/** Minimum balance to attempt a sweep (avoid dust). */
+const SWEEP_MIN_BALANCE = 10000n;
+
+/**
+ * After game end: send any remaining session key ETH back to the player, then clear the session key.
+ * No-op if no session key or balance too low. Non-throwing; logs and clears on failure.
+ */
+async function sweepSessionKeyToPlayer(
+  publicClient: ReturnType<typeof usePublicClient> | undefined,
+  playerAddress: `0x${string}`,
+): Promise<void> {
+  const sessionKey = getSessionKey();
+  if (!sessionKey || !publicClient) {
+    clearSessionKey();
+    return;
+  }
+  try {
+    const balance = await publicClient.getBalance({ address: sessionKey.address });
+    if (balance <= SWEEP_MIN_BALANCE) {
+      clearSessionKey();
+      return;
+    }
+    const gasPrice = await publicClient.getGasPrice();
+    const gasReserve = 21000n * gasPrice * 2n;
+    const valueToSend = balance > gasReserve ? balance - gasReserve : 0n;
+    if (valueToSend <= 0n) {
+      clearSessionKey();
+      return;
+    }
+    const sessionClient = createSessionWalletClient(SUPPORTED_CHAIN, RPC_URL);
+    if (!sessionClient) {
+      clearSessionKey();
+      return;
+    }
+    const hash = await sessionClient.sendTransaction({
+      to:   playerAddress,
+      value: valueToSend,
+      gas:  21000n,
+    });
+    await publicClient.waitForTransactionReceipt({ hash });
+  } catch (e) {
+    console.warn("[sweep] session key balance return failed:", e);
+  } finally {
+    clearSessionKey();
+  }
 }
 
 // ─── Main Hook ────────────────────────────────────────────────────────────────
@@ -292,6 +340,24 @@ export function useGame() {
       }
 
       await refetchGame();
+
+      // If this flip ended the game (mine hit or auto-cashout), sweep session key balance to player
+      if (publicClient && gameState.gameId) {
+        const raw = await publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi:     MINESWEEPER_ABI,
+          functionName: "getGame",
+          args:    [gameState.gameId],
+        });
+        const status = Number((raw as readonly unknown[])[10]);
+        if (status === GameStatus.CASHED_OUT || status === GameStatus.GAME_OVER) {
+          if (playerAddress) {
+            await sweepSessionKeyToPlayer(publicClient, playerAddress);
+          } else {
+            clearSessionKey();
+          }
+        }
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to flip tile");
     } finally {
@@ -300,7 +366,7 @@ export function useGame() {
       // useEffect above clears it once the game becomes ACTIVE.
       if (!isFirstFlip) setPendingTile(null);
     }
-  }, [gameState, writeContractAsync, publicClient, refetchGame]);
+  }, [gameState, writeContractAsync, publicClient, playerAddress, refetchGame]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Cash Out  (signed by session key – zero wallet popups)
@@ -335,13 +401,17 @@ export function useGame() {
 
       await refetchGame();
       await refetchActiveGame();
-      clearSessionKey();
+      if (playerAddress) {
+        await sweepSessionKeyToPlayer(publicClient ?? undefined, playerAddress);
+      } else {
+        clearSessionKey();
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to cash out");
     } finally {
       setIsCashingOut(false);
     }
-  }, [gameState, writeContractAsync, publicClient, refetchGame, refetchActiveGame]);
+  }, [gameState, writeContractAsync, publicClient, playerAddress, refetchGame, refetchActiveGame]);
 
   // ── Watch TileRevealed events ────────────────────────────────────────────
   useWatchContractEvent({
@@ -388,7 +458,11 @@ export function useGame() {
       if (publicClient) {
         await publicClient.waitForTransactionReceipt({ hash });
       }
-      clearSessionKey();
+      if (playerAddress) {
+        await sweepSessionKeyToPlayer(publicClient ?? undefined, playerAddress);
+      } else {
+        clearSessionKey();
+      }
       setGameState(EMPTY_STATE);
       setError(null);
       await refetchActiveGame();
@@ -399,7 +473,7 @@ export function useGame() {
     } finally {
       setIsCancelling(false);
     }
-  }, [gameState.gameId, writeContractAsync, publicClient, refetchActiveGame]);
+  }, [gameState.gameId, writeContractAsync, publicClient, playerAddress, refetchActiveGame]);
 
   // ── Reset (start over after win/loss) ────────────────────────────────────
   const resetGame = useCallback(() => {
