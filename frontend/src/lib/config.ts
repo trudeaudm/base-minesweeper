@@ -43,18 +43,18 @@ export const GRID_INFO = {
     entryLabel: "0.001 ETH",
   },
   [GRID_MEDIUM]: {
-    label:      "5×7",
-    rows:       7,
+    label:      "5×6",
+    rows:       6,
     cols:       5,
-    totalTiles: 35,
+    totalTiles: 30,
     entryFee:   BigInt("5000000000000000"),  // 0.005 ETH
     entryLabel: "0.005 ETH",
   },
   [GRID_LARGE]: {
-    label:      "5×11",
-    rows:       11,
+    label:      "5×10",
+    rows:       10,
     cols:       5,
-    totalTiles: 55,
+    totalTiles: 50,
     entryFee:   BigInt("10000000000000000"), // 0.01 ETH
     entryLabel: "0.01 ETH",
   },
@@ -67,7 +67,7 @@ export const DIFF_INFO = {
 } as const;
 
 export const MINE_COUNTS = {
-  [GRID_SMALL]:  { [DIFF_EASY]: 3, [DIFF_NORMAL]: 4, [DIFF_HARD]: 6  },
+  [GRID_SMALL]:  { [DIFF_EASY]: 4, [DIFF_NORMAL]: 5, [DIFF_HARD]: 6  },
   [GRID_MEDIUM]: { [DIFF_EASY]: 5, [DIFF_NORMAL]: 7, [DIFF_HARD]: 10 },
   [GRID_LARGE]:  { [DIFF_EASY]: 8, [DIFF_NORMAL]: 11,[DIFF_HARD]: 15 },
 } as const;
@@ -82,15 +82,17 @@ export enum GameStatus {
   CANCELLED          = 5,
 }
 
-// Max payout BPS
-export const MAX_PAYOUT_BPS_NORMAL = 19000n; // 1.90×
-export const MAX_PAYOUT_BPS_HARD   = 19500n; // 1.95×
+// Max payout BPS by difficulty (1.5×, 1.7×, 1.9×)
+export const MAX_PAYOUT_BPS_EASY   = 15000n; // 1.5×
+export const MAX_PAYOUT_BPS_NORMAL = 17000n; // 1.7×
+export const MAX_PAYOUT_BPS_HARD   = 19000n; // 1.9×
 export const BPS_DENOMINATOR       = 10000n;
 
 /** Max payout in wei for a grid + difficulty (matches contract logic for isGridAvailable). */
 export function getMaxPayoutWei(gridSize: number, difficulty: number): bigint {
   const cfg = GRID_INFO[gridSize as 0 | 1 | 2];
-  const bps = difficulty === DIFF_HARD ? MAX_PAYOUT_BPS_HARD : MAX_PAYOUT_BPS_NORMAL;
+  const bps = difficulty === DIFF_EASY ? MAX_PAYOUT_BPS_EASY
+    : difficulty === DIFF_NORMAL ? MAX_PAYOUT_BPS_NORMAL : MAX_PAYOUT_BPS_HARD;
   return (cfg.entryFee * bps) / BPS_DENOMINATOR;
 }
 
@@ -98,15 +100,15 @@ export function getMaxPayoutWei(gridSize: number, difficulty: number): bigint {
 export const CANCEL_BLOCKS_WAITING_FIRST_FLIP = 100;   // ~3.3 min on Base
 export const CANCEL_BLOCKS_WAITING_VRF        = 43200; // ~24h on Base
 
-/** Calculate payout multiplier string for display (0 → "0.00×", full → "1.90×") */
+/** Calculate payout multiplier for display (0 → 0, full → 1.5× / 1.7× / 1.9× by difficulty). */
 export function calcMultiplier(
   safeRevealed: number,
   totalSafe:    number,
-  isHard:       boolean
+  difficulty:   number // 0 Easy, 1 Normal, 2 Hard
 ): number {
   if (totalSafe === 0 || safeRevealed === 0) return 0;
-  const maxBps = isHard ? 1.95 : 1.9;
-  return (safeRevealed / totalSafe) * maxBps;
+  const maxMult = difficulty === 0 ? 1.5 : difficulty === 1 ? 1.7 : 1.9;
+  return (safeRevealed / totalSafe) * maxMult;
 }
 
 /** Format ETH value from bigint wei to human-readable string */

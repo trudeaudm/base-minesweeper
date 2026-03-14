@@ -25,7 +25,7 @@ export function LandingHero() {
           { icon: "⚡", text: "Instant payouts via smart contract" },
           { icon: "🔐", text: "Chainlink VRF randomness" },
           { icon: "💸", text: "Cash out any time — no gas popup" },
-          { icon: "🏆", text: "Up to 1.95× your entry fee" },
+          { icon: "🏆", text: "Up to 1.9× your entry fee (by difficulty)" },
         ].map(({ icon, text }) => (
           <div key={text} className="flex items-center gap-3 text-left px-4 py-3 bg-gray-50 rounded-[4px]">
             <span className="text-xl">{icon}</span>

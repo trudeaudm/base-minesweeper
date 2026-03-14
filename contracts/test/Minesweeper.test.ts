@@ -120,7 +120,7 @@ async function startAndFulfil(
 /** Get all safe tile indices for a game (not mines). */
 async function getSafeTiles(minesweeper: Minesweeper, gameId: bigint): Promise<number[]> {
   const g     = await minesweeper.getGame(gameId);
-  const total = [20, 35, 55][g.gridSize];
+  const total = [20, 30, 50][g.gridSize];
   const mine  = g.mineBitmask;
   const safe: number[] = [];
   for (let i = 0; i < total; i++) {
@@ -132,7 +132,7 @@ async function getSafeTiles(minesweeper: Minesweeper, gameId: bigint): Promise<n
 /** Get mine tile indices for a game. */
 async function getMineTiles(minesweeper: Minesweeper, gameId: bigint): Promise<number[]> {
   const g     = await minesweeper.getGame(gameId);
-  const total = [20, 35, 55][g.gridSize];
+  const total = [20, 30, 50][g.gridSize];
   const mine  = g.mineBitmask;
   const mines: number[] = [];
   for (let i = 0; i < total; i++) {
@@ -160,8 +160,8 @@ describe("Minesweeper", () => {
       const medium = await minesweeper.gridConfigs(GRID_MEDIUM);
       const large  = await minesweeper.gridConfigs(GRID_LARGE);
       expect(small.totalTiles).to.equal(20);
-      expect(medium.totalTiles).to.equal(35);
-      expect(large.totalTiles).to.equal(55);
+      expect(medium.totalTiles).to.equal(30);
+      expect(large.totalTiles).to.equal(50);
       expect(small.entryFee).to.equal(ENTRY_SMALL);
       expect(medium.entryFee).to.equal(ENTRY_MEDIUM);
       expect(large.entryFee).to.equal(ENTRY_LARGE);
@@ -169,8 +169,8 @@ describe("Minesweeper", () => {
 
     it("initialises mine counts", async () => {
       const { minesweeper } = await loadFixture(deployFixture);
-      expect(await minesweeper.mineCounts(GRID_SMALL,  DIFF_EASY)).to.equal(3);
-      expect(await minesweeper.mineCounts(GRID_SMALL,  DIFF_NORMAL)).to.equal(4);
+      expect(await minesweeper.mineCounts(GRID_SMALL,  DIFF_EASY)).to.equal(4);
+      expect(await minesweeper.mineCounts(GRID_SMALL,  DIFF_NORMAL)).to.equal(5);
       expect(await minesweeper.mineCounts(GRID_SMALL,  DIFF_HARD)).to.equal(6);
       expect(await minesweeper.mineCounts(GRID_MEDIUM, DIFF_EASY)).to.equal(5);
       expect(await minesweeper.mineCounts(GRID_MEDIUM, DIFF_NORMAL)).to.equal(7);
@@ -219,7 +219,7 @@ describe("Minesweeper", () => {
         value: ENTRY_SMALL,
       });
       const { reserved: after } = await minesweeper.getPoolHealth();
-      const expectedReserve = ENTRY_SMALL * 190n / 100n;
+      const expectedReserve = ENTRY_SMALL * 170n / 100n; // DIFF_NORMAL 1.7×
       expect(after - before).to.equal(expectedReserve);
     });
 
@@ -280,13 +280,13 @@ describe("Minesweeper", () => {
       expect(g.sessionKey).to.equal(sessionKey.address);
     });
 
-    it("hard difficulty reserves 1.95× entry", async () => {
+    it("hard difficulty reserves 1.9× entry", async () => {
       const { minesweeper, player } = await loadFixture(deployFixture);
       await minesweeper.connect(player).startGame(GRID_SMALL, DIFF_HARD, ethers.ZeroAddress, {
         value: ENTRY_SMALL,
       });
       const { reserved } = await minesweeper.getPoolHealth();
-      const expected = ENTRY_SMALL * 195n / 100n;
+      const expected = ENTRY_SMALL * 190n / 100n;
       expect(reserved).to.equal(expected);
     });
   });
@@ -363,7 +363,7 @@ describe("Minesweeper", () => {
         value: ENTRY_SMALL,
       });
       await expect(
-        minesweeper.connect(player).firstFlip(1n, 20) // SMALL only has 0-19
+        minesweeper.connect(player).firstFlip(1n, 20) // SMALL only has 0–19
       ).to.be.revertedWith("Tile out of range");
     });
 
@@ -446,7 +446,7 @@ describe("Minesweeper", () => {
       const { minesweeper, vrfMock, player } = await loadFixture(deployFixture);
       const gameId = await startAndFulfil(minesweeper, vrfMock, player, GRID_SMALL, DIFF_NORMAL);
       const mines = await getMineTiles(minesweeper, gameId);
-      expect(mines.length).to.equal(4);
+      expect(mines.length).to.equal(5); // GRID_SMALL DIFF_NORMAL
     });
 
     it("all mine bits within valid range", async () => {
@@ -455,7 +455,7 @@ describe("Minesweeper", () => {
       const mines = await getMineTiles(minesweeper, gameId);
       expect(mines.length).to.equal(15);
       for (const idx of mines) {
-        expect(idx).to.be.lt(55);
+        expect(idx).to.be.lt(50);
       }
     });
 
@@ -528,7 +528,7 @@ describe("Minesweeper", () => {
       const { minesweeper, vrfMock, player } = await loadFixture(deployFixture);
       const gameId = await startAndFulfil(minesweeper, vrfMock, player, GRID_SMALL, DIFF_NORMAL);
       await expect(
-        minesweeper.connect(player).flipTile(gameId, 20)
+        minesweeper.connect(player).flipTile(gameId, 20) // SMALL has 20 tiles (0–19)
       ).to.be.revertedWith("Tile out of range");
     });
   });
@@ -590,8 +590,8 @@ describe("Minesweeper", () => {
       const balAfter = await ethers.provider.getBalance(player.address);
       const received = balAfter + gasUsed - balBefore;
 
-      // safeRevealed = 3; payout = maxPayout × 3 / totalSafe
-      const maxPayout = ENTRY_SMALL * 190n / 100n;
+      // safeRevealed = 3; payout = maxPayout × 3 / totalSafe (DIFF_NORMAL 1.7×)
+      const maxPayout = ENTRY_SMALL * 170n / 100n;
       const expected  = maxPayout * 3n / BigInt(safeTiles.length);
       expect(received).to.equal(expected);
     });
@@ -622,14 +622,13 @@ describe("Minesweeper", () => {
       expect(g.status).to.equal(GameStatus.CASHED_OUT);
     });
 
-    it("full clear pays 1.9× entry fee", async () => {
+    it("full clear pays 1.7× entry fee (Normal)", async () => {
       const { minesweeper, vrfMock, player } = await loadFixture(deployFixture);
       const gameId    = await startAndFulfil(minesweeper, vrfMock, player, GRID_SMALL, DIFF_NORMAL);
       const safeTiles = await getSafeTiles(minesweeper, gameId);
 
       const balBefore = await ethers.provider.getBalance(player.address);
       let totalGas = 0n;
-      // Flip all safe tiles except the first (already auto-revealed)
       for (const tile of safeTiles.slice(1)) {
         const tx      = await minesweeper.connect(player).flipTile(gameId, tile);
         const receipt = await tx.wait();
@@ -637,7 +636,7 @@ describe("Minesweeper", () => {
       }
       const balAfter = await ethers.provider.getBalance(player.address);
       const received = balAfter + totalGas - balBefore;
-      const expected = ENTRY_SMALL * 190n / 100n;
+      const expected = ENTRY_SMALL * 170n / 100n;
       expect(received).to.equal(expected);
     });
 
@@ -695,7 +694,7 @@ describe("Minesweeper", () => {
         await minesweeper.connect(player).flipTile(gameId, safeTiles[i]);
       }
       const payout   = await minesweeper.getCurrentPayout(gameId);
-      const maxP     = ENTRY_SMALL * 190n / 100n;
+      const maxP     = ENTRY_SMALL * 170n / 100n; // DIFF_NORMAL 1.7×
       const expected = maxP * BigInt(quarter) / BigInt(safeTiles.length);
       expect(payout).to.equal(expected);
     });
@@ -760,7 +759,7 @@ describe("Minesweeper", () => {
     it("owner can update mine count", async () => {
       const { minesweeper, owner } = await loadFixture(deployFixture);
       await minesweeper.connect(owner).setMineCount(GRID_SMALL, DIFF_EASY, 2);
-      expect(await minesweeper.mineCounts(GRID_SMALL, DIFF_EASY)).to.equal(2);
+      expect(await minesweeper.mineCounts(GRID_SMALL, DIFF_EASY)).to.equal(2); // admin set to 2
     });
 
     it("owner can update max concurrent games", async () => {

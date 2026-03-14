@@ -21,16 +21,16 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  *
  * Grid sizes (all 5 tiles wide, portrait orientation):
  *   0 → 5×4  = 20 tiles   Entry: 0.001 ETH
- *   1 → 5×7  = 35 tiles   Entry: 0.005 ETH
- *   2 → 5×11 = 55 tiles   Entry: 0.01  ETH
+ *   1 → 5×6  = 30 tiles   Entry: 0.005 ETH
+ *   2 → 5×10 = 50 tiles   Entry: 0.01  ETH
  *
- * Difficulty mine counts:
- *   EASY:   3 / 5 / 8
- *   NORMAL: 4 / 7 / 11
- *   HARD:   6 / 10 / 15  (pays up to 1.95×)
+ * Difficulty mine counts (SMALL / MEDIUM / LARGE):
+ *   EASY:   4 / 5 / 8
+ *   NORMAL: 5 / 7 / 11
+ *   HARD:   6 / 10 / 15
  *
- * Payout curve (linear): multiplier = (safeRevealed / totalSafe) × maxMultiplier
- *   where maxMultiplier = 1.9× (EASY/NORMAL) or 1.95× (HARD)
+ * Payout curve (linear): payout = maxPayout × (safeRevealed / totalSafe)
+ *   Max payout by difficulty: EASY 1.5×, NORMAL 1.7×, HARD 1.9×
  */
 contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
 
@@ -39,15 +39,17 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     // ─────────────────────────────────────────────
 
     uint8 public constant GRID_SMALL  = 0; // 5×4  = 20 tiles
-    uint8 public constant GRID_MEDIUM = 1; // 5×7  = 35 tiles
-    uint8 public constant GRID_LARGE  = 2; // 5×11 = 55 tiles
+    uint8 public constant GRID_MEDIUM = 1; // 5×6  = 30 tiles
+    uint8 public constant GRID_LARGE  = 2; // 5×10 = 50 tiles
 
     uint8 public constant DIFF_EASY   = 0;
     uint8 public constant DIFF_NORMAL = 1;
     uint8 public constant DIFF_HARD   = 2;
 
-    uint16 public constant MAX_PAYOUT_BPS_NORMAL = 19000; // 1.90×  in basis-points of entry fee
-    uint16 public constant MAX_PAYOUT_BPS_HARD   = 19500; // 1.95×
+    // Max payout as multiple of entry (by difficulty)
+    uint16 public constant MAX_PAYOUT_BPS_EASY   = 15000; // 1.5×
+    uint16 public constant MAX_PAYOUT_BPS_NORMAL = 17000; // 1.7×
+    uint16 public constant MAX_PAYOUT_BPS_HARD   = 19000; // 1.9×
     uint16 public constant BPS_DENOMINATOR        = 10000;
 
     // Block-based cancellation thresholds (~3.3 min and ~24h on Base at 2s/block)
@@ -61,7 +63,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     struct GridConfig {
         uint8   totalTiles;
         uint256 entryFee;          // in wei
-        uint16  maxPayoutBPS;      // for EASY/NORMAL; HARD uses MAX_PAYOUT_BPS_HARD
+        uint16  maxPayoutBPS;      // legacy; payout uses difficulty-based BPS
         uint32  maxConcurrent;     // cap active games for this grid
         uint256 minPoolThreshold;  // pool must have >= this to open grid
         bool    active;
@@ -205,7 +207,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
             active:           true
         });
         gridConfigs[GRID_MEDIUM] = GridConfig({
-            totalTiles:       35,
+            totalTiles:       30,
             entryFee:         0.005 ether,
             maxPayoutBPS:     MAX_PAYOUT_BPS_NORMAL,
             maxConcurrent:    20,
@@ -213,7 +215,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
             active:           true
         });
         gridConfigs[GRID_LARGE] = GridConfig({
-            totalTiles:       55,
+            totalTiles:       50,
             entryFee:         0.01 ether,
             maxPayoutBPS:     MAX_PAYOUT_BPS_NORMAL,
             maxConcurrent:    10,
@@ -223,14 +225,14 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
 
         // ── Mine counts ──
         // SMALL (5×4 = 20 tiles)
-        mineCounts[GRID_SMALL][DIFF_EASY]   = 3;
-        mineCounts[GRID_SMALL][DIFF_NORMAL] = 4;
+        mineCounts[GRID_SMALL][DIFF_EASY]   = 4;
+        mineCounts[GRID_SMALL][DIFF_NORMAL] = 5;
         mineCounts[GRID_SMALL][DIFF_HARD]   = 6;
-        // MEDIUM (5×7 = 35 tiles)
+        // MEDIUM (5×6 = 30 tiles)
         mineCounts[GRID_MEDIUM][DIFF_EASY]   = 5;
         mineCounts[GRID_MEDIUM][DIFF_NORMAL] = 7;
         mineCounts[GRID_MEDIUM][DIFF_HARD]   = 10;
-        // LARGE (5×11 = 55 tiles)
+        // LARGE (5×10 = 50 tiles)
         mineCounts[GRID_LARGE][DIFF_EASY]   = 8;
         mineCounts[GRID_LARGE][DIFF_NORMAL] = 11;
         mineCounts[GRID_LARGE][DIFF_HARD]   = 15;
@@ -275,8 +277,9 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         require(playerActiveGame[msg.sender] == 0, "Active game exists");
         require(activeGameCount[gridSize] < cfg.maxConcurrent, "Grid at capacity");
 
-        // Pool availability check
-        uint16 payoutBPS = difficulty == DIFF_HARD ? MAX_PAYOUT_BPS_HARD : cfg.maxPayoutBPS;
+        // Pool availability check (payout by difficulty)
+        uint16 payoutBPS = difficulty == DIFF_EASY ? MAX_PAYOUT_BPS_EASY
+            : (difficulty == DIFF_NORMAL ? MAX_PAYOUT_BPS_NORMAL : MAX_PAYOUT_BPS_HARD);
         uint256 maxPayout = (cfg.entryFee * payoutBPS) / BPS_DENOMINATOR;
         uint256 fee = (cfg.entryFee * platformFeeBPS) / BPS_DENOMINATOR;
         uint256 netBet = cfg.entryFee - fee;
@@ -579,7 +582,8 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         if (!cfg.active) return false;
         if (activeGameCount[gridSize] >= cfg.maxConcurrent) return false;
 
-        uint16 payoutBPS  = difficulty == DIFF_HARD ? MAX_PAYOUT_BPS_HARD : cfg.maxPayoutBPS;
+        uint16 payoutBPS  = difficulty == DIFF_EASY ? MAX_PAYOUT_BPS_EASY
+            : (difficulty == DIFF_NORMAL ? MAX_PAYOUT_BPS_NORMAL : MAX_PAYOUT_BPS_HARD);
         uint256 maxPayout = (cfg.entryFee * payoutBPS) / BPS_DENOMINATOR;
         uint256 fee       = (cfg.entryFee * platformFeeBPS) / BPS_DENOMINATOR;
         uint256 netBet    = cfg.entryFee - fee;

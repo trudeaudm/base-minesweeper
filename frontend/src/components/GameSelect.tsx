@@ -40,7 +40,7 @@ function GridOption({
 }) {
   const info   = GRID_INFO[gridSize as 0 | 1 | 2];
   const mines  = MINE_COUNTS[gridSize as 0|1|2][difficulty as 0|1|2];
-  const maxMulti = difficulty === 2 ? "1.95×" : "1.90×";
+  const maxMulti = difficulty === 0 ? "1.5×" : difficulty === 1 ? "1.7×" : "1.9×";
 
   return (
     <button
@@ -165,10 +165,7 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
           })}
         </div>
         <p className="mt-2 text-xs text-gray-500 text-center">
-          {selectedDiff === DIFF_HARD
-            ? "Hard mode pays up to 1.95× entry"
-            : "Easy / Normal pay up to 1.90× entry"
-          }
+          Easy 1.5× · Normal 1.7× · Hard 1.9× max payout
         </p>
       </div>
 

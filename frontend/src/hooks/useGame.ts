@@ -199,8 +199,7 @@ export function useGame() {
 
     const status     = statusNum as GameStatus;
     const totalTiles = GRID_INFO[gridSize as 0|1|2].totalTiles;
-    const isHard     = difficulty === 2;
-    const mult       = calcMultiplier(safeRevealed, totalSafe, isHard);
+    const mult       = calcMultiplier(safeRevealed, totalSafe, difficulty);
     const payout     = safeRevealed === 0
       ? 0n
       : (maxPayout * BigInt(safeRevealed)) / BigInt(totalSafe);

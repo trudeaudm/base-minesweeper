@@ -8,8 +8,8 @@ import { CONTRACT_ADDRESS, formatEth, CANCEL_BLOCKS_WAITING_FIRST_FLIP, CANCEL_B
 
 const GRID_LABELS: Record<number, string> = {
   0: "5×4",
-  1: "5×7",
-  2: "5×11",
+  1: "5×6",
+  2: "5×10",
 };
 
 const STATUS_LABELS: Record<number, string> = {
