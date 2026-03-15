@@ -206,7 +206,7 @@ export function useGame() {
 
   const [burstRevealOrder, setBurstRevealOrder] = useState<number[]>([]);
 
-  const FLIP_BATCH_DELAY_MS = 50;
+  const FLIP_BATCH_DELAY_MS = 300;
 
   // ── Current block number (for block-based cancel countdown) ───────────────
   // Poll block number instead of watch (avoids "filter not found" on Alchemy/HTTP RPCs)
@@ -406,6 +406,8 @@ export function useGame() {
   //         with all collected indices in one tx.
   // ─────────────────────────────────────────────────────────────────────────
   const flushBatch = useCallback(async () => {
+    // Lock all unrevealed tiles, so no new clicks until tx completes.
+    setTilesLockedForFlip(true);
     // Clear the 50ms debounce timer; we are now executing the batch (no further resets).
     if (batchTimerRef.current) {
       clearTimeout(batchTimerRef.current);
@@ -427,7 +429,7 @@ export function useGame() {
     setPendingTiles([]);
     setError(null);
     // Lock all unrevealed tiles (isFlipPending = true) so no new clicks until tx completes.
-    // setTilesLockedForFlip(true);
+    // setTilesLockedForFlip(true); buggy
     setIsFlipInFlight(true);
     try {
       const useSession = await canUseSessionKey(publicClient);
