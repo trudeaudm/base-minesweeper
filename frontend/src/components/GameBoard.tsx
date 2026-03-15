@@ -44,7 +44,6 @@ export interface GameBoardProps {
   isCashout?:             boolean;
   pendingTilesRef?:       RefObject<number[]>;
   isFlipPending?:         boolean;  // true when flip tx in flight (after 50ms debounce)
-  waitingForVrfResponse?: boolean;  // first click made, VRF in-flight: disable all, grey, fly animation
   burstRevealOrder?:      number[];  // tile indices in click order for burst reveal
   onBurstRevealComplete?: () => void;
   mineHitTileIndex?:      number | null;
@@ -97,7 +96,6 @@ export function GameBoard({
   isCashout = false,
   pendingTilesRef,
   isFlipPending = false,
-  waitingForVrfResponse = false,
   burstRevealOrder = [],
   onBurstRevealComplete,
   mineHitTileIndex = null,
@@ -112,9 +110,6 @@ export function GameBoard({
   const isWaitingVRF = status === GameStatus.WAITING_VRF;
   const isGameOver   = status === GameStatus.GAME_OVER;
   const isWinReveal  = status === GameStatus.CASHED_OUT;
-
-  // When waiting for VRF: all tiles disabled, greyed, and play fly animation
-  const tilesGreyedAndFly = waitingForVrfResponse;
 
   const [explodingTiles, setExplodingTiles] = useState<Set<number>>(new Set());
   const [explodedTiles, setExplodedTiles]   = useState<Set<number>>(new Set());
@@ -247,10 +242,7 @@ export function GameBoard({
       >
         {tileStates.map((state, i) => {
           const burstIdx = burstRevealOrder.indexOf(i);
-          // Only lock unrevealed tiles from: 50ms debounce (isFlipPending), VRF wait, game over, or cashed out.
-          // Do not use pendingTiles/pendingTilesRef or !active here — that greys tiles before the 50ms window.
           const disabled =
-            waitingForVrfResponse ||
             isGameOver ||
             isWinReveal ||
             state !== "unrevealed" ||
@@ -270,8 +262,8 @@ export function GameBoard({
               onClick={onFlip}
               disabled={disabled}
               isCashout={isCashout && active}
-              isWaitingVRF={tilesGreyedAndFly && state === "unrevealed"}
-              flyDirection={tilesGreyedAndFly && state === "unrevealed" ? getFlyDirection(i) : undefined}
+              isWaitingVRF={false}
+              flyDirection={undefined}
               isHighlighted={false}
               isGameOver={isGameOver && state === "unrevealed"}
               isWinReveal={isWinReveal && state === "unrevealed"}

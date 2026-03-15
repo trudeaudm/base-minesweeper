@@ -73,8 +73,8 @@ export const MINE_COUNTS = {
 
 // Game status enum — must match GameStatus in Minesweeper.sol exactly
 export enum GameStatus {
-  WAITING_FIRST_FLIP = 0, // startGame done; player clicks a tile to trigger VRF
-  WAITING_VRF        = 1, // VRF request in-flight; mines not yet placed
+  WAITING_FIRST_FLIP = 0, // VRF fulfilled; board ready; player clicks a tile (mines placed on firstFlip)
+  WAITING_VRF        = 1, // startGame done; VRF request in-flight; mines not yet placed
   ACTIVE             = 2, // mines placed; player can flip tiles
   CASHED_OUT         = 3,
   GAME_OVER          = 4,
@@ -94,7 +94,7 @@ export function getMaxPayoutWei(entryFee: bigint, difficulty: number): bigint {
   return (entryFee * bps) / BPS_DENOMINATOR;
 }
 
-// Block-based cancellation: only before first flip (must match Minesweeper.sol)
+// Block-based cancellation: only while stuck in WAITING_VRF after startGame (must match Minesweeper.sol CANCEL_BLOCKS_WAITING_VRF)
 export const CANCEL_BLOCKS_WAITING_FIRST_FLIP = 100;   // ~3.3 min on Base
 
 /** Calculate payout multiplier for display (0 → 0, full → 1.5× / 1.7× / 1.9× by difficulty). */

@@ -5,6 +5,7 @@ import { LandingHero } from "@/components/LandingHero";
 import { GameSelect } from "@/components/GameSelect";
 import { GameBoard } from "@/components/GameBoard";
 import { GameStatusBar } from "@/components/GameStatus";
+import { LoadingTileGrid } from "@/components/LoadingTileGrid";
 import { WinScreen } from "@/components/WinScreen";
 import { GameOverScreen } from "@/components/GameOverScreen";
 import { useGame } from "@/hooks/useGame";
@@ -25,10 +26,8 @@ function GameApp() {
     blocksUntilCancel,
     canCancel,
     cancelThresholdBlocks,
-    pendingTile,
     pendingTilesRef,
     isFlipPending,
-    waitingForVrfResponse,
     burstRevealOrder,
     onBurstRevealComplete,
     mineHitTileIndex,
@@ -97,8 +96,37 @@ function GameApp() {
 
         {view === "playing" && (
           <div className="w-full max-w-sm space-y-5">
-            {/* BUG 1: Do not render board or stats until game data has loaded — show loading to avoid wrong grid size / zeroed values */}
-            {!isGameDataReady ? (
+            {/* WAITING_VRF: show loading screen with decorative tile grid; no real board yet */}
+            {gameState.status === GameStatus.WAITING_VRF ? (
+              <div className="w-full max-w-xs mx-auto flex flex-col items-center justify-center py-8" aria-busy="true">
+                <div className="w-10 h-10 border-2 border-base-blue border-t-transparent rounded-full animate-spin" aria-hidden />
+                <p className="mt-4 text-gray-600 text-sm">Generating provably fair randomness...</p>
+                <div className="mt-6 w-full">
+                  <LoadingTileGrid gridSize={gameState.gridSize as 0 | 1 | 2} />
+                </div>
+                <GameStatusBar
+                  gridSize={gameState.gridSize}
+                  difficulty={gameState.difficulty}
+                  entryFee={gameState.entryFee}
+                  maxPayout={gameState.maxPayout}
+                  currentPayout={0n}
+                  multiplier={0}
+                  safeRevealed={0}
+                  totalSafe={gameState.totalSafe}
+                  status={gameState.status}
+                  onCashOut={() => {}}
+                  isCashingOut={false}
+                  isWaitingFirstFlip={false}
+                  isWaitingVRF={true}
+                  cancelBlockDataReady={cancelBlockDataReady}
+                  blocksUntilCancel={blocksUntilCancel}
+                  canCancel={canCancel}
+                  cancelThresholdBlocks={cancelThresholdBlocks}
+                  onCancelGame={handleCancelGame}
+                  isCancelling={isCancelling}
+                />
+              </div>
+            ) : !isGameDataReady ? (
               <div className="w-full max-w-xs mx-auto flex flex-col items-center justify-center py-16" aria-busy="true">
                 <div className="w-10 h-10 border-2 border-base-blue border-t-transparent rounded-full animate-spin" aria-hidden />
                 <p className="mt-4 text-gray-600 text-sm">Loading game...</p>
@@ -138,7 +166,6 @@ function GameApp() {
                   isCashout={gameState.safeRevealed > 0 && gameState.isActive}
                   pendingTilesRef={pendingTilesRef}
                   isFlipPending={isFlipPending}
-                  waitingForVrfResponse={waitingForVrfResponse}
                   burstRevealOrder={burstRevealOrder}
                   onBurstRevealComplete={onBurstRevealComplete}
                   mineHitTileIndex={mineHitTileIndex}

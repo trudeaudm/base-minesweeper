@@ -17,6 +17,8 @@ import {
   SESSION_GAS_BUDGET,
   GameStatus,
   calcMultiplier,
+  getMaxPayoutWei,
+  MINE_COUNTS,
   CANCEL_BLOCKS_WAITING_FIRST_FLIP,
 } from "@/lib/config";
 import { useGridConfigs } from "@/hooks/useGridConfigs";
@@ -29,7 +31,7 @@ import {
 import type { PublicClient } from "viem";
 
 // Explicit gas limits for session-key txs (avoid "gas required exceeds allowance (0)" when estimation fails)
-const GAS_LIMIT_FIRST_FLIP = 600_000n;  // firstFlip requests VRF + state updates
+const GAS_LIMIT_FIRST_FLIP = 300_000n;  // firstFlip places mines + reveals (sync; VRF already on-chain)
 const GAS_LIMIT_FLIP_TILES = 400_000n;
 const GAS_LIMIT_CASH_OUT  = 200_000n;
 
@@ -186,7 +188,6 @@ export function useGame() {
   const publicClient = usePublicClient();
 
   const [gameState, setGameState]         = useState<GameState>(EMPTY_STATE);
-  const [pendingTile, setPendingTile]     = useState<number | null>(null);
   const [pendingTiles, setPendingTiles]   = useState<number[]>([]);
   const [mineHitTileIndex, setMineHitTileIndex] = useState<number | null>(null);
   const [explosionComplete, setExplosionComplete] = useState(true);
@@ -207,7 +208,7 @@ export function useGame() {
   const [burstRevealOrder, setBurstRevealOrder] = useState<number[]>([]);
 
   const { gridInfo } = useGridConfigs();
-  const FLIP_BATCH_DELAY_MS = 1000;
+  const FLIP_BATCH_DELAY_MS = 800;
 
   // ── Current block number (for block-based cancel countdown) ───────────────
   // Poll block number instead of watch (avoids "filter not found" on Alchemy/HTTP RPCs)
@@ -242,21 +243,21 @@ export function useGame() {
     },
   });
 
-  // BUG 1: gameReady only when gameState has been synced from contract (entryFee, maxPayout, grid dimensions). Effect runs after rawGame arrives, so we must not show board until effect has run and populated these.
+  // Board only when status has left WAITING_VRF (so WAITING_FIRST_FLIP or ACTIVE/ended) AND game data synced from contract.
   const isGameDataReady =
     !!currentGameId &&
     currentGameId > 0n &&
     rawGame != null &&
     !isGetGameLoading &&
+    gameState.status !== GameStatus.WAITING_VRF &&
     gameState.entryFee > 0n &&
     gameState.maxPayout > 0n &&
     (gameState.gridSize === 0 || gameState.gridSize === 1 || gameState.gridSize === 2) &&
     gameState.totalSafe > 0;
 
-  // ── Clear pending when game goes ACTIVE (VRF resolved) or on unmount ───
+  // ── Clear pending when game goes ACTIVE (first flip resolved) or on unmount ───
   useEffect(() => {
     if (gameState.isActive) {
-      setPendingTile(null);
       setPendingTiles([]);
       if (batchTimerRef.current) {
         clearTimeout(batchTimerRef.current);
@@ -291,9 +292,6 @@ export function useGame() {
       setMineHitTileIndex(null);
     }
 
-    if (pendingTile !== null && tiles[pendingTile] === "unrevealed") {
-      tiles[pendingTile] = "pending";
-    }
     // Use ref so pending state is applied as soon as ref is updated (same tick as click), not only when state flushes.
     for (const i of pendingTilesRef.current) {
       if (i < tiles.length && tiles[i] === "unrevealed") tiles[i] = "pending";
@@ -332,7 +330,7 @@ export function useGame() {
       isCashedOut:        status === GameStatus.CASHED_OUT,
       isGameOver:         status === GameStatus.GAME_OVER,
     });
-  }, [rawGame, currentGameId, pendingTile, pendingTiles, gridInfo]);
+  }, [rawGame, currentGameId, pendingTiles, gridInfo]);
 
   // ── Wallet write hook (used only for startGame) ──────────────────────────
   const { writeContractAsync } = useWriteContract();
@@ -373,7 +371,6 @@ export function useGame() {
         const started = logs.find(l => l.eventName === "GameStarted");
         if (started) {
           const gameId = (started.args as { gameId: bigint }).gameId;
-          setPendingTile(null);
           setPendingTiles([]);
           pendingTilesRef.current = [];
           setTilesLockedForFlip(false);
@@ -382,12 +379,20 @@ export function useGame() {
             clearTimeout(batchTimerRef.current);
             batchTimerRef.current = null;
           }
+          const totalTiles = cfg.totalTiles;
+          const totalSafe = totalTiles - MINE_COUNTS[gridSize as 0|1|2][difficulty as 0|1|2];
+          const maxPayout = getMaxPayoutWei(cfg.entryFee, difficulty);
           setGameState(prev => ({
             ...prev,
             gameId,
-            status:             GameStatus.WAITING_FIRST_FLIP,
-            isWaitingFirstFlip: true,
-            isWaitingVRF:       false,
+            status:             GameStatus.WAITING_VRF,
+            isWaitingFirstFlip: false,
+            isWaitingVRF:       true,
+            gridSize,
+            difficulty,
+            entryFee:           cfg.entryFee,
+            maxPayout,
+            totalSafe,
           }));
           refetchGame();
           refetchActiveGame();
@@ -419,61 +424,82 @@ export function useGame() {
     const current = pendingTilesRef.current;
     if (current.length === 0) return;
     const g = gameStateRef.current;
-    // Guard: only send if we still have an active game (user might have cancelled or navigated).
-    if (!g.gameId || !g.isActive) return;
+    if (!g.gameId) return;
 
-    // Store click order for burst-reveal animation (tiles reveal in order user clicked).
-    lastFlipClickOrderRef.current = [...current];
-    // Contract expects sorted, unique indices; Set dedupes, sort for deterministic ordering.
-    const tileIndices = [...new Set(current)].sort((a, b) => a - b) as readonly number[];
-    // Clear pending state immediately so UI stops showing pending animation and we don’t double-send.
     pendingTilesRef.current = [];
     setPendingTiles([]);
     setError(null);
-    // Lock all unrevealed tiles (isFlipPending = true) so no new clicks until tx completes.
-    // setTilesLockedForFlip(true); buggy
     setIsFlipInFlight(true);
+
+    const isFirstFlip = g.isWaitingFirstFlip && current.length >= 1;
+    const tileIndex = current[0];
+
     try {
       const useSession = await canUseSessionKey(publicClient);
       const sessionClient = useSession ? createSessionWalletClient(SUPPORTED_CHAIN, RPC_URL) : null;
-      if (sessionClient) {
-        // Session key signs flipTiles (no wallet popup).
-        const hash = await sessionClient.writeContract({
-          address:      CONTRACT_ADDRESS,
-          abi:          MINESWEEPER_ABI,
-          functionName: "flipTiles",
-          args:         [g.gameId, tileIndices],
-          gas:          GAS_LIMIT_FLIP_TILES,
-        });
-        const receipt = await publicClient?.waitForTransactionReceipt({ hash });
-        if (receipt?.logs) {
-          const logs = parseEventLogs({ abi: MINESWEEPER_ABI, logs: receipt.logs });
-          const gameOver = logs.find((l) => l.eventName === "GameOver");
-          if (gameOver) {
-            const { mineTile } = (gameOver.args as { mineTile: number });
-            setMineHitTileIndex(mineTile);
-            setExplosionComplete(false);
-          }
+
+      if (isFirstFlip) {
+        if (sessionClient) {
+          const hash = await sessionClient.writeContract({
+            address:      CONTRACT_ADDRESS,
+            abi:          MINESWEEPER_ABI,
+            functionName: "firstFlip",
+            args:         [g.gameId, tileIndex],
+            gas:          GAS_LIMIT_FIRST_FLIP,
+          });
+          await publicClient?.waitForTransactionReceipt({ hash });
+        } else {
+          await writeContractAsync({
+            address:      CONTRACT_ADDRESS,
+            abi:          MINESWEEPER_ABI,
+            functionName: "firstFlip",
+            args:         [g.gameId, tileIndex],
+          });
         }
       } else {
-        // Fallback: connected wallet signs (one popup per batch).
-        const hash = await writeContractAsync({
-          address:      CONTRACT_ADDRESS,
-          abi:          MINESWEEPER_ABI,
-          functionName: "flipTiles",
-          args:         [g.gameId, tileIndices],
-        });
-        const receipt = await publicClient?.waitForTransactionReceipt({ hash });
-        if (receipt?.logs) {
-          const logs = parseEventLogs({ abi: MINESWEEPER_ABI, logs: receipt.logs });
-          const gameOver = logs.find((l) => l.eventName === "GameOver");
-          if (gameOver) {
-            const { mineTile } = (gameOver.args as { mineTile: number });
-            setMineHitTileIndex(mineTile);
-            setExplosionComplete(false);
+        if (!g.isActive) return;
+        // Store click order for burst-reveal animation (tiles reveal in order user clicked).
+        lastFlipClickOrderRef.current = [...current];
+        const tileIndices = [...new Set(current)].sort((a, b) => a - b) as readonly number[];
+    // Clear pending state immediately so UI stops showing pending animation and we don’t double-send.
+        if (sessionClient) {
+          const hash = await sessionClient.writeContract({
+            address:      CONTRACT_ADDRESS,
+            abi:          MINESWEEPER_ABI,
+            functionName: "flipTiles",
+            args:         [g.gameId, tileIndices],
+            gas:          GAS_LIMIT_FLIP_TILES,
+          });
+          const receipt = await publicClient?.waitForTransactionReceipt({ hash });
+          if (receipt?.logs) {
+            const logs = parseEventLogs({ abi: MINESWEEPER_ABI, logs: receipt.logs });
+            const gameOver = logs.find((l) => l.eventName === "GameOver");
+            if (gameOver) {
+              const { mineTile } = (gameOver.args as { mineTile: number });
+              setMineHitTileIndex(mineTile);
+              setExplosionComplete(false);
+            }
+          }
+        } else {
+          const hash = await writeContractAsync({
+            address:      CONTRACT_ADDRESS,
+            abi:          MINESWEEPER_ABI,
+            functionName: "flipTiles",
+            args:         [g.gameId, tileIndices],
+          });
+          const receipt = await publicClient?.waitForTransactionReceipt({ hash });
+          if (receipt?.logs) {
+            const logs = parseEventLogs({ abi: MINESWEEPER_ABI, logs: receipt.logs });
+            const gameOver = logs.find((l) => l.eventName === "GameOver");
+            if (gameOver) {
+              const { mineTile } = (gameOver.args as { mineTile: number });
+              setMineHitTileIndex(mineTile);
+              setExplosionComplete(false);
+            }
           }
         }
       }
+
       await refetchGame();
       // If game ended (cashed out or hit mine), sweep session key balance back to player and clear key.
       if (publicClient && g.gameId) {
@@ -515,54 +541,16 @@ export function useGame() {
     setError(null);
 
     if (isFirstFlip) {
-      // Sync update so UI shows this tile as pending (grey + fly) immediately; no batching for first flip.
-      flushSync(() => setPendingTile(tileIndex));
-      (async () => {
-        try {
-          const fnName = "firstFlip";
-          const useSession = await canUseSessionKey(publicClient);
-          const sessionClient = useSession ? createSessionWalletClient(SUPPORTED_CHAIN, RPC_URL) : null;
-          if (sessionClient) {
-            const hash = await sessionClient.writeContract({
-              address:      CONTRACT_ADDRESS,
-              abi:          MINESWEEPER_ABI,
-              functionName: fnName,
-              args:         [gameId, tileIndex],
-              gas:          GAS_LIMIT_FIRST_FLIP,
-            });
-            await publicClient?.waitForTransactionReceipt({ hash });
-          } else {
-            await writeContractAsync({
-              address:      CONTRACT_ADDRESS,
-              abi:          MINESWEEPER_ABI,
-              functionName: fnName,
-              args:         [gameId, tileIndex],
-            });
-          }
-          await refetchGame();
-          if (publicClient) {
-            const raw = await publicClient.readContract({
-              address: CONTRACT_ADDRESS,
-              abi:     MINESWEEPER_ABI,
-              functionName: "getGame",
-              args:    [gameId],
-            });
-            const status = Number((raw as readonly unknown[])[10]);
-            if (status === GameStatus.CASHED_OUT || status === GameStatus.GAME_OVER) {
-              if (playerAddress) await sweepSessionKeyToPlayer(publicClient, playerAddress);
-              else clearSessionKey();
-            }
-          }
-        } catch (e: unknown) {
-          setError(normalizeWalletError(e));
-        }
-        // Do not clear pendingTile here — let the effect clear it when status becomes ACTIVE (VRF received).
-        // Clearing here would stop the fly animation early when tx confirms but before VRF callback.
-      })();
+      // First click: single tile in batch; flushBatch will call firstFlip() (sync, VRF already on-chain).
+      const next = [tileIndex];
+      pendingTilesRef.current = next;
+      flushSync(() => setPendingTiles(next));
+      if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
+      batchTimerRef.current = setTimeout(() => flushBatch(), FLIP_BATCH_DELAY_MS);
       return;
     }
 
-    // ── ACTIVE: batch this click with others; send one flipTiles() after 50ms of no further clicks. ──
+    // ── ACTIVE: batch this click with others; send one flipTiles() after debounce. ──
     // Build next batch: add tileIndex if not already present (idempotent for same tile).
     const next = pendingTilesRef.current.includes(tileIndex)
       ? pendingTilesRef.current
@@ -576,7 +564,7 @@ export function useGame() {
     batchTimerRef.current = setTimeout(() => {
       flushBatch();
     }, FLIP_BATCH_DELAY_MS);
-  }, [gameState, writeContractAsync, publicClient, playerAddress, refetchGame, flushBatch]);
+  }, [gameState, writeContractAsync, publicClient, playerAddress, refetchGame, flushBatch, FLIP_BATCH_DELAY_MS]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Cash Out  (signed by session key – zero wallet popups)
@@ -692,7 +680,6 @@ export function useGame() {
     setBurstRevealOrder([]);
     lastFlipClickOrderRef.current = [];
     setError(null);
-    setPendingTile(null);
     setPendingTiles([]);
     pendingTilesRef.current = [];
     setTilesLockedForFlip(false);
@@ -705,18 +692,18 @@ export function useGame() {
     refetchActiveGame();
   }, [refetchActiveGame]);
 
-  // ── Block-based cancel eligibility (only before first flip; no cancel once game started) ──
+  // ── Block-based cancel eligibility (only while stuck in WAITING_VRF after startGame) ──
   const cancelBlockDataReady = gameState.startBlock > 0n;
   const cancelThresholdBlocks = CANCEL_BLOCKS_WAITING_FIRST_FLIP;
   const cancelBlock = gameState.startBlock + BigInt(cancelThresholdBlocks);
   const canCancel =
-    gameState.isWaitingFirstFlip &&
+    gameState.isWaitingVRF &&
     cancelBlockDataReady &&
     currentBlock > 0n &&
     cancelBlock > 0n &&
     currentBlock > cancelBlock;
   const blocksUntilCancel =
-    gameState.isWaitingFirstFlip &&
+    gameState.isWaitingVRF &&
     cancelBlockDataReady &&
     currentBlock > 0n &&
     cancelBlock > currentBlock
@@ -731,12 +718,7 @@ export function useGame() {
     setBurstRevealOrder([]);
   }, []);
 
-  // BUG 2: Grey/disable only when 50ms timer has fired and we're inside flushBatch. tilesLockedForFlip is set true ONLY inside setTimeout callback, never in click handler.
   const isFlipPending = tilesLockedForFlip;
-
-  // From the moment the first tile is clicked until VRF returns: disable all tiles, grey out, show fly animation
-  const waitingForVrfResponse =
-    (gameState.isWaitingFirstFlip && pendingTile !== null) || gameState.isWaitingVRF;
 
   return {
     gameState,
@@ -744,12 +726,10 @@ export function useGame() {
     isStarting,
     isCashingOut,
     isCancelling,
-    pendingTile,
     pendingTiles,
     pendingTilesRef,
     isFlipPending,
     isFlipInFlight,
-    waitingForVrfResponse,
     burstRevealOrder,
     onBurstRevealComplete,
     error,

@@ -128,7 +128,7 @@ export function AdminPage() {
         for (let i = 0; i < ids.length; i++) {
           const r = results[i] as readonly unknown[];
           const status = Number(r[10]);
-          if (status !== 0) continue; // only WAITING_FIRST_FLIP can be cancelled
+          if (status !== 1) continue; // only WAITING_VRF can be cancelled (stuck after startGame)
           const startBlock = typeof r[11] === "bigint" ? r[11] : BigInt(Number(r[11]));
           const requiredBlocks = CANCEL_BLOCKS_WAITING_FIRST_FLIP;
           const blocksElapsed = blockNum - Number(startBlock);
@@ -375,7 +375,7 @@ export function AdminPage() {
           <section className="border border-gray-200 rounded-[4px] p-4">
             <h2 className="text-lg font-semibold text-[#111111] mb-3">Stuck Games</h2>
             {stuckGames.length === 0 ? (
-              <p className="text-sm text-gray-500">No stuck games (WAITING_FIRST_FLIP / WAITING_VRF).</p>
+              <p className="text-sm text-gray-500">No stuck games (WAITING_VRF).</p>
             ) : (
               <ul className="space-y-3">
                 {stuckGames.map((g) => (

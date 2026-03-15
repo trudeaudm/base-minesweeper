@@ -50,7 +50,7 @@ export function GameStatusBar({
   const diffInfo   = DIFF_INFO[difficulty as 0 | 1 | 2];
   const isActive   = status === GameStatus.ACTIVE;
   const canCashout = isActive && safeRevealed > 0;
-  const showCancelUI = isWaitingFirstFlip && cancelBlockDataReady;
+  const showCancelUI = isWaitingVRF && cancelBlockDataReady;
   const gridLabel = info?.label ?? "…";
 
   const progressPct = totalSafe > 0 ? (safeRevealed / totalSafe) * 100 : 0;
@@ -118,20 +118,20 @@ export function GameStatusBar({
         </div>
       )}
 
-      {/* Waiting for VRF after first click — animation is on the board */}
+      {/* Shown only when status is WAITING_VRF (loading screen); board not visible yet */}
       {isWaitingVRF && (
         <div className="text-center py-3 space-y-2">
           <div className="inline-flex items-center gap-2 text-base-blue text-sm">
             <div className="w-4 h-4 border-2 border-base-blue border-t-transparent rounded-full animate-spin" />
-            Generating mine layout…
+            Generating provably fair randomness…
           </div>
           <p className="text-xs text-gray-500">
-            Waiting for Chainlink VRF randomness
+            Waiting for Chainlink VRF
           </p>
         </div>
       )}
 
-      {/* Cancel only before first flip: 100-block countdown or button */}
+      {/* Cancel when stuck in WAITING_VRF: 100-block countdown or button */}
       {showCancelUI && (
         <div className="space-y-2">
           {blocksUntilCancel > 0 ? (
