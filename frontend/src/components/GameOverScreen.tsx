@@ -25,6 +25,7 @@ export function GameOverScreen({ gridSize, difficulty, onPlayAgain }: GameOverPr
   const [explodedLetters, setExplodedLetters] = useState<Set<number>>(new Set());
   const [animationComplete, setAnimationComplete] = useState(false);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const { gridInfo } = useGridConfigs();
 
   useEffect(() => {
     const t = setTimeout(() => setShow(true), 400);
@@ -65,7 +66,6 @@ export function GameOverScreen({ gridSize, difficulty, onPlayAgain }: GameOverPr
 
   if (animationComplete) return null;
 
-  const { gridInfo } = useGridConfigs();
   const info     = gridInfo?.[gridSize as 0 | 1 | 2];
   const diffInfo = DIFF_INFO[difficulty as 0 | 1 | 2];
   const gridLabel = info?.label ?? "…";
