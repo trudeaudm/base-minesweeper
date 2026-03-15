@@ -207,7 +207,7 @@ export const MINESWEEPER_ABI = [
     type: "function",
     name: "setPlatformFee",
     stateMutability: "nonpayable",
-    inputs: [{ name: "feeBPS", type: "uint8" }],
+    inputs: [{ name: "feeBPS", type: "uint16" }],
     outputs: [],
   },
   {
@@ -319,7 +319,7 @@ export const MINESWEEPER_ABI = [
     name: "platformFeeBPS",
     stateMutability: "view",
     inputs: [],
-    outputs: [{ name: "", type: "uint8" }],
+    outputs: [{ name: "", type: "uint16" }],
   },
   {
     type: "function",

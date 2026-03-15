@@ -19,7 +19,7 @@ import {
   calcMultiplier,
   getMaxPayoutWei,
   MINE_COUNTS,
-  CANCEL_BLOCKS_WAITING_FIRST_FLIP,
+  CANCEL_BLOCKS_WAITING_VRF,
 } from "@/lib/config";
 import { useGridConfigs } from "@/hooks/useGridConfigs";
 import {
@@ -705,7 +705,7 @@ export function useGame() {
 
   // ── Block-based cancel eligibility (only while stuck in WAITING_VRF after startGame) ──
   const cancelBlockDataReady = gameState.startBlock > 0n;
-  const cancelThresholdBlocks = CANCEL_BLOCKS_WAITING_FIRST_FLIP;
+  const cancelThresholdBlocks = CANCEL_BLOCKS_WAITING_VRF;
   const cancelBlock = gameState.startBlock + BigInt(cancelThresholdBlocks);
   const canCancel =
     gameState.isWaitingVRF &&

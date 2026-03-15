@@ -4,7 +4,7 @@ import { parseEther } from "viem";
 import { Header } from "@/components/Header";
 import { LandingHero } from "@/components/LandingHero";
 import { MINESWEEPER_ABI } from "@/abis/Minesweeper";
-import { CONTRACT_ADDRESS, formatEth, CANCEL_BLOCKS_WAITING_FIRST_FLIP } from "@/lib/config";
+import { CONTRACT_ADDRESS, formatEth, CANCEL_BLOCKS_WAITING_VRF } from "@/lib/config";
 
 const GRID_LABELS: Record<number, string> = {
   0: "5×4",
@@ -130,7 +130,7 @@ export function AdminPage() {
           const status = Number(r[10]);
           if (status !== 1) continue; // only WAITING_VRF can be cancelled (stuck after startGame)
           const startBlock = typeof r[11] === "bigint" ? r[11] : BigInt(Number(r[11]));
-          const requiredBlocks = CANCEL_BLOCKS_WAITING_FIRST_FLIP;
+          const requiredBlocks = CANCEL_BLOCKS_WAITING_VRF;
           const blocksElapsed = blockNum - Number(startBlock);
           const eligible = blockNum > Number(startBlock) + requiredBlocks;
           games.push({

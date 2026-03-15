@@ -38,6 +38,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     // Enums & Constants
     // ─────────────────────────────────────────────
 
+    uint8 public constant GRID_COLS   = 5;
     uint8 public constant GRID_SMALL  = 0; // 5×4  = 20 tiles
     uint8 public constant GRID_MEDIUM = 1; // 5×6  = 30 tiles
     uint8 public constant GRID_LARGE  = 2; // 5×10 = 50 tiles
@@ -144,7 +145,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
 
     bytes32 public vrfKeyHash;
     uint256 public vrfSubscriptionId;
-    uint32  public vrfCallbackGasLimit = 500_000;
+    uint32  public vrfCallbackGasLimit = 80_000;
     uint16  public vrfRequestConfirmations = 3;
 
     // ─────────────────────────────────────────────
@@ -308,8 +309,6 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         // Accounting (only entry fee goes to pool/fees; gas budget already forwarded)
         feeBalance  += fee;
         poolBalance -= poolRisk;
-        poolBalance += netBet;
-        poolBalance -= netBet;
         reservedBalance += maxPayout;
 
         activeGameCount[gridSize]++;
@@ -462,6 +461,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         nonReentrant
         onlyPlayerOrSession(gameId)
     {
+        require(tileIndices.length > 0, "No tiles provided");
         Game storage g = games[gameId];
         require(g.status == GameStatus.ACTIVE, "Game not active");
         uint8 totalTiles = gridConfigs[g.gridSize].totalTiles;
@@ -585,17 +585,16 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         uint8  tileIndex,
         uint8  totalTiles
     ) internal pure returns (uint8) {
-        uint8 cols = 5;
-        uint8 row = tileIndex / cols;
-        uint8 col = tileIndex % cols;
+        uint8 row = tileIndex / GRID_COLS;
+        uint8 col = tileIndex % GRID_COLS;
         uint8 count = 0;
         for (int256 dr = -1; dr <= 1; dr++) {
             for (int256 dc = -1; dc <= 1; dc++) {
                 if (dr == 0 && dc == 0) continue;
                 int256 nr = int256(uint256(row)) + dr;
                 int256 nc = int256(uint256(col)) + dc;
-                if (nr < 0 || nc < 0 || nc >= 5) continue;
-                uint256 ni = uint256(nr) * 5 + uint256(nc);
+                if (nr < 0 || nc < 0 || nc >= int256(uint256(GRID_COLS))) continue;
+                uint256 ni = uint256(nr) * GRID_COLS + uint256(nc);
                 if (ni >= totalTiles) continue;
                 if ((bitmask >> ni) & 1 == 1) count++;
             }
@@ -901,11 +900,10 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         activeGameCount[g.gridSize]--;
         playerActiveGame[g.player] = 0;
 
-        if (netBet > 0 && poolBalance >= netBet) {
-            poolBalance -= netBet;
-            (bool ok, ) = g.player.call{value: netBet}("");
-            require(ok, "Refund failed");
-        }
+        require(netBet > 0 && poolBalance >= netBet, "Pool cannot cover refund");
+        poolBalance -= netBet;
+        (bool ok, ) = g.player.call{value: netBet}("");
+        require(ok, "Refund failed");
     }
 
     // Accept direct ETH deposits (treated as pool contribution)

@@ -95,7 +95,7 @@ export function getMaxPayoutWei(entryFee: bigint, difficulty: number): bigint {
 }
 
 // Block-based cancellation: only while stuck in WAITING_VRF after startGame (must match Minesweeper.sol CANCEL_BLOCKS_WAITING_VRF)
-export const CANCEL_BLOCKS_WAITING_FIRST_FLIP = 100;   // ~3.3 min on Base
+export const CANCEL_BLOCKS_WAITING_VRF = 100;   // ~3.3 min on Base
 
 /** Calculate payout multiplier for display (0 → 0, full → 1.5× / 1.7× / 1.9× by difficulty). */
 export function calcMultiplier(
