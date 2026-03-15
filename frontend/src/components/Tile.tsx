@@ -70,8 +70,12 @@ export function Tile({
           : flyDirection === "down"
             ? "animate-tile-fly-down"
             : "";
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (!disabled && state === "unrevealed") {
+      const el = e.currentTarget;
+      el.classList.add("tile-pending-anim");
+      el.setAttribute("data-tile-pending", "true");
+      if (process.env.NODE_ENV === "development") console.log("[tile] pending class applied", index);
       onClick(index);
     }
   };
@@ -142,22 +146,7 @@ export function Tile({
     );
   }
 
-  // ── Pending look: shake + grow to 1.1 (clicked, waiting for tx or waiting in burst queue) — BUG 3: class at click via ref; GPU layer so animation isn't throttled
-  if (showAsPending) {
-    return (
-      <div
-        className="
-          relative flex items-center justify-center
-          rounded-[3px] w-full aspect-square
-          bg-base-blue border border-blue-400/25 shadow-tile
-          animate-tile-pending cursor-wait
-        "
-        style={{ willChange: "transform" }}
-        data-tile-pending
-        aria-hidden
-      />
-    );
-  }
+  /* BUG 3: No separate pending div — same button gets .tile-pending-anim in handleClick and when showAsPending so animation is visible within one frame */
 
   // ── Mine (single reveal, or burst reveal with puff then reveal)
   if (state === "mine") {
@@ -258,7 +247,7 @@ export function Tile({
     );
   }
 
-  // ── Unrevealed — interactive ──────────────────────────────────────────────
+  // ── Unrevealed (and pending) — single button; BUG 3: class applied in handleClick + when showAsPending
   return (
     <button
       onClick={handleClick}
@@ -272,9 +261,11 @@ export function Tile({
           ? "cursor-not-allowed bg-base-blue opacity-60"
           : "cursor-pointer bg-base-blue hover:bg-blue-500 active:scale-95 hover:shadow-cashout transition-colors duration-150"
         }
+        ${showAsPending ? "tile-pending-anim cursor-wait" : ""}
         ${isShaking ? "animate-tile-shake" : ""}
         ${isHighlighted ? "shadow-tile-glow ring-2 ring-base-blue/40" : ""}
       `}
+      data-tile-pending={showAsPending ? true : undefined}
       aria-label={`Tile ${index}`}
     />
   );

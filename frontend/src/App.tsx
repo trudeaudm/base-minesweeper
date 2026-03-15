@@ -99,16 +99,9 @@ function GameApp() {
           <div className="w-full max-w-sm space-y-5">
             {/* BUG 1: Do not render board or stats until game data has loaded — show loading to avoid wrong grid size / zeroed values */}
             {!isGameDataReady ? (
-              <div className="w-full max-w-xs mx-auto space-y-5 animate-pulse">
-                <div className="h-24 rounded-[6px] bg-gray-100" aria-hidden />
-                <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
-                  {Array.from({ length: 20 }).map((_, i) => (
-                    <div key={i} className="aspect-square rounded-[3px] bg-gray-100" aria-hidden />
-                  ))}
-                </div>
-                <div className="flex items-center justify-center py-8">
-                  <div className="w-8 h-8 border-2 border-base-blue border-t-transparent rounded-full animate-spin" aria-label="Loading game" />
-                </div>
+              <div className="w-full max-w-xs mx-auto flex flex-col items-center justify-center py-16" aria-busy="true">
+                <div className="w-10 h-10 border-2 border-base-blue border-t-transparent rounded-full animate-spin" aria-hidden />
+                <p className="mt-4 text-gray-600 text-sm">Loading game...</p>
               </div>
             ) : (
               <>

@@ -194,6 +194,7 @@ export function useGame() {
   const [isCashingOut, setIsCashingOut]   = useState(false);
   const [isCancelling, setIsCancelling]   = useState(false);
   const [isFlipInFlight, setIsFlipInFlight] = useState(false);
+  const [tilesLockedForFlip, setTilesLockedForFlip] = useState(false); // BUG 2: set true ONLY inside 50ms setTimeout callback, never in click handler
   const [error, setError]                 = useState<string | null>(null);
   const sessionAcc = useRef(getOrCreateSessionKey());
   const batchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -240,8 +241,16 @@ export function useGame() {
     },
   });
 
-  // Board must not render until we have real game data (BUG 1: avoid wrong grid size / zeroed stats)
-  const isGameDataReady = !!currentGameId && currentGameId > 0n && rawGame != null && !isGetGameLoading;
+  // BUG 1: gameReady only when gameState has been synced from contract (entryFee, maxPayout, grid dimensions). Effect runs after rawGame arrives, so we must not show board until effect has run and populated these.
+  const isGameDataReady =
+    !!currentGameId &&
+    currentGameId > 0n &&
+    rawGame != null &&
+    !isGetGameLoading &&
+    gameState.entryFee > 0n &&
+    gameState.maxPayout > 0n &&
+    (gameState.gridSize === 0 || gameState.gridSize === 1 || gameState.gridSize === 2) &&
+    gameState.totalSafe > 0;
 
   // ── Clear pending when game goes ACTIVE (VRF resolved) or on unmount ───
   useEffect(() => {
@@ -402,7 +411,8 @@ export function useGame() {
     pendingTilesRef.current = [];
     setPendingTiles([]);
     setError(null);
-    setIsFlipInFlight(true); // Grey out only when batch fires, not during the 50ms collection window
+    setTilesLockedForFlip(true);
+    setIsFlipInFlight(true);
     try {
       const useSession = await canUseSessionKey(publicClient);
       const sessionClient = useSession ? createSessionWalletClient(SUPPORTED_CHAIN, RPC_URL) : null;
@@ -462,6 +472,7 @@ export function useGame() {
     } catch (e: unknown) {
       setError(normalizeWalletError(e));
     } finally {
+      setTilesLockedForFlip(false);
       setIsFlipInFlight(false);
     }
   }, [publicClient, playerAddress, refetchGame, writeContractAsync]);
@@ -681,9 +692,8 @@ export function useGame() {
     setBurstRevealOrder([]);
   }, []);
 
-  // Grey/disable only after 50ms has passed and flushBatch has run (BUG 2: during 50ms window tiles stay blue and clickable).
-  const inDebounceWindow = gameState.isActive && pendingTilesRef.current.length > 0;
-  const isFlipPending = isFlipInFlight && !inDebounceWindow;
+  // BUG 2: Grey/disable only when 50ms timer has fired and we're inside flushBatch. tilesLockedForFlip is set true ONLY inside setTimeout callback, never in click handler.
+  const isFlipPending = tilesLockedForFlip;
 
   // From the moment the first tile is clicked until VRF returns: disable all tiles, grey out, show fly animation
   const waitingForVrfResponse =

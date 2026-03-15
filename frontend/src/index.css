@@ -49,3 +49,13 @@ html, body, #root {
 .tile-wrapper {
   perspective: 600px;
 }
+
+/* BUG 3: Pending tile shake/grow — high specificity so no other rule overrides transform */
+@keyframes tilePendingForced {
+  0%, 100% { transform: scale(1) translate(0, 0); }
+  50%      { transform: scale(1.08) translate(2px, -2px); }
+}
+[data-tile-pending].tile-pending-anim,
+button.tile-pending-anim {
+  animation: tilePendingForced 0.3s ease-in-out infinite !important;
+}
