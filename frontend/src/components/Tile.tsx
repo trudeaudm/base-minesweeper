@@ -70,12 +70,17 @@ export function Tile({
           : flyDirection === "down"
             ? "animate-tile-fly-down"
             : "";
+  // ── Tile click: apply pending animation immediately, then notify parent (useGame.flipTile) ──
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    // Only handle clicks on unrevealed tiles that are not disabled (e.g. not during VRF wait or flip tx).
     if (!disabled && state === "unrevealed") {
       const el = e.currentTarget;
+      // Apply pending animation class in the same tick so shake/grow is visible before any re-render.
       el.classList.add("tile-pending-anim");
+      // Optional: mark for tests or DOM inspection that this tile is in pending state.
       el.setAttribute("data-tile-pending", "true");
       if (process.env.NODE_ENV === "development") console.log("[tile] pending class applied", index);
+      // Notify parent: GameBoard passes onFlip, which is useGame.flipTile(index). Triggers batch or firstFlip.
       onClick(index);
     }
   };

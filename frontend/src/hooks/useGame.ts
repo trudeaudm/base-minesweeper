@@ -406,26 +406,34 @@ export function useGame() {
   //         with all collected indices in one tx.
   // ─────────────────────────────────────────────────────────────────────────
   const flushBatch = useCallback(async () => {
+    // Clear the 50ms debounce timer; we are now executing the batch (no further resets).
     if (batchTimerRef.current) {
       clearTimeout(batchTimerRef.current);
       batchTimerRef.current = null;
     }
+    // Snapshot current batch of tile indices (ref is source of truth at timer fire).
     const current = pendingTilesRef.current;
     if (current.length === 0) return;
     const g = gameStateRef.current;
+    // Guard: only send if we still have an active game (user might have cancelled or navigated).
     if (!g.gameId || !g.isActive) return;
 
+    // Store click order for burst-reveal animation (tiles reveal in order user clicked).
     lastFlipClickOrderRef.current = [...current];
+    // Contract expects sorted, unique indices; Set dedupes, sort for deterministic ordering.
     const tileIndices = [...new Set(current)].sort((a, b) => a - b) as readonly number[];
+    // Clear pending state immediately so UI stops showing pending animation and we don’t double-send.
     pendingTilesRef.current = [];
     setPendingTiles([]);
     setError(null);
-    setTilesLockedForFlip(true);
+    // Lock all unrevealed tiles (isFlipPending = true) so no new clicks until tx completes.
+    // setTilesLockedForFlip(true);
     setIsFlipInFlight(true);
     try {
       const useSession = await canUseSessionKey(publicClient);
       const sessionClient = useSession ? createSessionWalletClient(SUPPORTED_CHAIN, RPC_URL) : null;
       if (sessionClient) {
+        // Session key signs flipTiles (no wallet popup).
         const hash = await sessionClient.writeContract({
           address:      CONTRACT_ADDRESS,
           abi:          MINESWEEPER_ABI,
@@ -444,6 +452,7 @@ export function useGame() {
           }
         }
       } else {
+        // Fallback: connected wallet signs (one popup per batch).
         const hash = await writeContractAsync({
           address:      CONTRACT_ADDRESS,
           abi:          MINESWEEPER_ABI,
@@ -462,6 +471,7 @@ export function useGame() {
         }
       }
       await refetchGame();
+      // If game ended (cashed out or hit mine), sweep session key balance back to player and clear key.
       if (publicClient && g.gameId) {
         const raw = await publicClient.readContract({
           address: CONTRACT_ADDRESS,
@@ -481,6 +491,7 @@ export function useGame() {
     } catch (e: unknown) {
       setError(normalizeWalletError(e));
     } finally {
+      // Unlock tiles so user can click again (and so next batch can run if they click).
       setTilesLockedForFlip(false);
       setIsFlipInFlight(false);
     }
@@ -492,12 +503,15 @@ export function useGame() {
     // Ignore all clicks while VRF is in flight — tiles are disabled; prevent any restart of first-click state.
     if (gameState.status === GameStatus.WAITING_VRF) return;
     const isFirstFlip = gameState.isWaitingFirstFlip;
+    // If not first flip, we must be in ACTIVE state to accept clicks.
     if (!isFirstFlip && !gameState.isActive) return;
+    // Only allow flipping unrevealed tiles (ignore safe/mine/pending).
     if (gameState.tileStates[tileIndex] !== "unrevealed") return;
 
     setError(null);
 
     if (isFirstFlip) {
+      // Sync update so UI shows this tile as pending (grey + fly) immediately; no batching for first flip.
       flushSync(() => setPendingTile(tileIndex));
       (async () => {
         try {
@@ -544,13 +558,16 @@ export function useGame() {
       return;
     }
 
-    // ACTIVE: add to batch and start/reset delay timer. Update ref synchronously so isFlipPending stays false during 50ms.
-    // Apply pending state immediately (same tick) so the tile shows shake/scale animation on click — flushSync forces a sync re-render while ref is already set.
+    // ── ACTIVE: batch this click with others; send one flipTiles() after 50ms of no further clicks. ──
+    // Build next batch: add tileIndex if not already present (idempotent for same tile).
     const next = pendingTilesRef.current.includes(tileIndex)
       ? pendingTilesRef.current
       : [...pendingTilesRef.current, tileIndex];
+    // Update ref first so pendingIndicesRef.current includes this index before any re-render (Tile uses it for showAsPending).
     pendingTilesRef.current = next;
+    // Force synchronous re-render so board shows pending state; isFlipPending stays false until flushBatch runs.
     flushSync(() => setPendingTiles(next));
+    // Reset the 50ms debounce: each new click restarts the timer so we batch rapid clicks into one tx.
     if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
     batchTimerRef.current = setTimeout(() => {
       flushBatch();
