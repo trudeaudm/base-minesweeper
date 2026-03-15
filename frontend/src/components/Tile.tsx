@@ -142,7 +142,7 @@ export function Tile({
     );
   }
 
-  // ── Pending look: shake + grow to 1.1 (clicked, waiting for tx or waiting in burst queue)
+  // ── Pending look: shake + grow to 1.1 (clicked, waiting for tx or waiting in burst queue) — BUG 3: class at click via ref; GPU layer so animation isn't throttled
   if (showAsPending) {
     return (
       <div
@@ -152,6 +152,8 @@ export function Tile({
           bg-base-blue border border-blue-400/25 shadow-tile
           animate-tile-pending cursor-wait
         "
+        style={{ willChange: "transform" }}
+        data-tile-pending
         aria-hidden
       />
     );

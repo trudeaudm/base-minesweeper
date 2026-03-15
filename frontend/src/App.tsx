@@ -16,6 +16,7 @@ type AppView = "select" | "playing";
 function GameApp() {
   const {
     gameState,
+    isGameDataReady,
     isStarting,
     isCashingOut,
     isCancelling,
@@ -96,69 +97,86 @@ function GameApp() {
 
         {view === "playing" && (
           <div className="w-full max-w-sm space-y-5">
-            {/* Status bar */}
-            <GameStatusBar
-              gridSize={gameState.gridSize}
-              difficulty={gameState.difficulty}
-              entryFee={gameState.entryFee}
-              maxPayout={gameState.maxPayout}
-              currentPayout={gameState.currentPayout}
-              multiplier={gameState.multiplier}
-              safeRevealed={gameState.safeRevealed}
-              totalSafe={gameState.totalSafe}
-              status={gameState.status}
-              onCashOut={cashOut}
-              isCashingOut={isCashingOut}
-              isWaitingFirstFlip={gameState.isWaitingFirstFlip}
-              isWaitingVRF={gameState.isWaitingVRF}
-              cancelBlockDataReady={cancelBlockDataReady}
-              blocksUntilCancel={blocksUntilCancel}
-              canCancel={canCancel}
-              cancelThresholdBlocks={cancelThresholdBlocks}
-              onCancelGame={handleCancelGame}
-              isCancelling={isCancelling}
-            />
-
-            {/* Game grid */}
-            <GameBoard
-              gridSize={gameState.gridSize}
-              tileStates={gameState.tileStates}
-              mineBitmask={gameState.mineBitmask}
-              status={gameState.status}
-              onFlip={flipTile}
-              isCashout={gameState.safeRevealed > 0 && gameState.isActive}
-              pendingTilesRef={pendingTilesRef}
-              isFlipPending={isFlipPending}
-              waitingForVrfResponse={waitingForVrfResponse}
-              burstRevealOrder={burstRevealOrder}
-              onBurstRevealComplete={onBurstRevealComplete}
-              mineHitTileIndex={mineHitTileIndex}
-              onExplosionComplete={onExplosionComplete}
-              explosionComplete={explosionComplete}
-            />
-
-            {/* Session key indicator — hide when game over */}
-            {gameState.sessionKeyAddr && !gameState.isGameOver && (
-              <div className="px-3 py-2 bg-gray-100 rounded-[4px] flex items-center justify-between">
-                <span className="text-xs text-gray-500">Session key active</span>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 bg-accent-green rounded-full animate-pulse" />
-                  <span className="text-xs font-mono text-gray-500 truncate max-w-[140px]">
-                    {gameState.sessionKeyAddr}
-                  </span>
+            {/* BUG 1: Do not render board or stats until game data has loaded — show loading to avoid wrong grid size / zeroed values */}
+            {!isGameDataReady ? (
+              <div className="w-full max-w-xs mx-auto space-y-5 animate-pulse">
+                <div className="h-24 rounded-[6px] bg-gray-100" aria-hidden />
+                <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+                  {Array.from({ length: 20 }).map((_, i) => (
+                    <div key={i} className="aspect-square rounded-[3px] bg-gray-100" aria-hidden />
+                  ))}
+                </div>
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-8 h-8 border-2 border-base-blue border-t-transparent rounded-full animate-spin" aria-label="Loading game" />
                 </div>
               </div>
-            )}
+            ) : (
+              <>
+                {/* Status bar */}
+                <GameStatusBar
+                  gridSize={gameState.gridSize}
+                  difficulty={gameState.difficulty}
+                  entryFee={gameState.entryFee}
+                  maxPayout={gameState.maxPayout}
+                  currentPayout={gameState.currentPayout}
+                  multiplier={gameState.multiplier}
+                  safeRevealed={gameState.safeRevealed}
+                  totalSafe={gameState.totalSafe}
+                  status={gameState.status}
+                  onCashOut={cashOut}
+                  isCashingOut={isCashingOut}
+                  isWaitingFirstFlip={gameState.isWaitingFirstFlip}
+                  isWaitingVRF={gameState.isWaitingVRF}
+                  cancelBlockDataReady={cancelBlockDataReady}
+                  blocksUntilCancel={blocksUntilCancel}
+                  canCancel={canCancel}
+                  cancelThresholdBlocks={cancelThresholdBlocks}
+                  onCancelGame={handleCancelGame}
+                  isCancelling={isCancelling}
+                />
 
-            {/* Back to new game — when game is over */}
-            {gameState.isGameOver && (
-              <button
-                type="button"
-                onClick={resetGame}
-                className="w-full py-3.5 rounded-[6px] font-bold text-base bg-base-blue text-white hover:bg-blue-500 active:scale-[0.98] transition-colors"
-              >
-                New Game
-              </button>
+                {/* Game grid — only rendered when isGameDataReady so dimensions and data are correct */}
+                <GameBoard
+                  gridSize={gameState.gridSize}
+                  tileStates={gameState.tileStates}
+                  mineBitmask={gameState.mineBitmask}
+                  status={gameState.status}
+                  onFlip={flipTile}
+                  isCashout={gameState.safeRevealed > 0 && gameState.isActive}
+                  pendingTilesRef={pendingTilesRef}
+                  isFlipPending={isFlipPending}
+                  waitingForVrfResponse={waitingForVrfResponse}
+                  burstRevealOrder={burstRevealOrder}
+                  onBurstRevealComplete={onBurstRevealComplete}
+                  mineHitTileIndex={mineHitTileIndex}
+                  onExplosionComplete={onExplosionComplete}
+                  explosionComplete={explosionComplete}
+                />
+
+                {/* Session key indicator — hide when game over */}
+                {gameState.sessionKeyAddr && !gameState.isGameOver && (
+                  <div className="px-3 py-2 bg-gray-100 rounded-[4px] flex items-center justify-between">
+                    <span className="text-xs text-gray-500">Session key active</span>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 bg-accent-green rounded-full animate-pulse" />
+                      <span className="text-xs font-mono text-gray-500 truncate max-w-[140px]">
+                        {gameState.sessionKeyAddr}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Back to new game — when game is over */}
+                {gameState.isGameOver && (
+                  <button
+                    type="button"
+                    onClick={resetGame}
+                    className="w-full py-3.5 rounded-[6px] font-bold text-base bg-base-blue text-white hover:bg-blue-500 active:scale-[0.98] transition-colors"
+                  >
+                    New Game
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}

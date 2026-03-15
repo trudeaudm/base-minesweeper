@@ -229,7 +229,7 @@ export function useGame() {
   const currentGameId = gameState.gameId ?? (activeGameId && activeGameId > 0n ? activeGameId : null);
 
   // ── Read full game state ─────────────────────────────────────────────────
-  const { data: rawGame, refetch: refetchGame } = useReadContract({
+  const { data: rawGame, isLoading: isGetGameLoading, refetch: refetchGame } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi:     MINESWEEPER_ABI,
     functionName: "getGame",
@@ -239,6 +239,9 @@ export function useGame() {
       refetchInterval: 6_000,
     },
   });
+
+  // Board must not render until we have real game data (BUG 1: avoid wrong grid size / zeroed stats)
+  const isGameDataReady = !!currentGameId && currentGameId > 0n && rawGame != null && !isGetGameLoading;
 
   // ── Clear pending when game goes ACTIVE (VRF resolved) or on unmount ───
   useEffect(() => {
@@ -678,8 +681,9 @@ export function useGame() {
     setBurstRevealOrder([]);
   }, []);
 
-  // Grey/disable only when a flip tx is actually in flight (inside flushBatch). Never grey during the 50ms debounce window.
-  const isFlipPending = isFlipInFlight;
+  // Grey/disable only after 50ms has passed and flushBatch has run (BUG 2: during 50ms window tiles stay blue and clickable).
+  const inDebounceWindow = gameState.isActive && pendingTilesRef.current.length > 0;
+  const isFlipPending = isFlipInFlight && !inDebounceWindow;
 
   // From the moment the first tile is clicked until VRF returns: disable all tiles, grey out, show fly animation
   const waitingForVrfResponse =
@@ -687,6 +691,7 @@ export function useGame() {
 
   return {
     gameState,
+    isGameDataReady,
     isStarting,
     isCashingOut,
     isCancelling,
