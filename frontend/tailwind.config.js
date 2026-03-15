@@ -38,6 +38,14 @@ export default {
         "tile-shake":      "tileShake 0.35s ease-in-out",
         "tile-pending":    "tilePending 0.6s ease-in-out infinite",
         "tile-burst":      "tileBurst 0.25s ease-out forwards",
+        "tile-puff":       "tilePuff 0.4s ease-out forwards",
+        "tile-fly-left":   "tileFlyLeft 2s ease-in-out infinite",
+        "tile-fly-right":  "tileFlyRight 2s ease-in-out infinite",
+        "tile-fly-up":     "tileFlyUp 2s ease-in-out infinite",
+        "tile-fly-down":   "tileFlyDown 2s ease-in-out infinite",
+        "rugged-slide-in": "ruggedSlideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards",
+        "rugged-letter-explode": "ruggedLetterExplode 0.4s ease-out forwards",
+        "reveal-after-puff": "revealAfterPuff 0.2s ease-out 0.35s forwards",
       },
       keyframes: {
         vrfBarSpin: {
@@ -136,6 +144,44 @@ export default {
         tileBurst: {
           "0%":   { transform: "scale(1.1)" },
           "100%": { transform: "scale(1)" },
+        },
+        // ── VRF wait: tile flies off-screen then back (per direction)
+        tileFlyLeft: {
+          "0%, 100%": { transform: "translateX(0)" },
+          "50%":      { transform: "translateX(-120%)" },
+        },
+        tileFlyRight: {
+          "0%, 100%": { transform: "translateX(0)" },
+          "50%":      { transform: "translateX(120%)" },
+        },
+        tileFlyUp: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%":      { transform: "translateY(-120%)" },
+        },
+        tileFlyDown: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%":      { transform: "translateY(120%)" },
+        },
+        // ── Puff: tile dissolves into blue pixels then reveals result
+        tilePuff: {
+          "0%":   { transform: "scale(1)", opacity: "1", filter: "blur(0px)" },
+          "50%":  { transform: "scale(1.4)", opacity: "0.6", filter: "blur(2px)" },
+          "100%": { transform: "scale(1.5)", opacity: "0", filter: "blur(4px)" },
+        },
+        // ── RUGGED: word slides in from off-screen
+        ruggedSlideIn: {
+          "0%":   { transform: "translateY(-120%)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
+        },
+        // ── RUGGED: single letter explodes into pixels
+        ruggedLetterExplode: {
+          "0%":   { transform: "scale(1)", opacity: "1" },
+          "100%": { transform: "scale(2)", opacity: "0" },
+        },
+        // ── Reveal content after puff (opacity in after delay)
+        revealAfterPuff: {
+          "0%":   { opacity: "0" },
+          "100%": { opacity: "1" },
         },
       },
       boxShadow: {

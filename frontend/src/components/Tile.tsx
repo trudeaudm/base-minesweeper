@@ -1,23 +1,24 @@
 import { type TileState } from "@/hooks/useGame";
 import { BaseMineIcon } from "./BaseLogo";
-import type { ExplosionPhase } from "./GameBoard";
+import type { ExplosionPhase, TileFlyDirection } from "./GameBoard";
 
 interface TileProps {
-  index:           number;
-  cols:            number;
-  state:           TileState;
-  adjacentCount?:  number;
-  onClick:         (index: number) => void;
-  disabled:         boolean;
-  isCashout?:      boolean;  // pulse hint: player can cash out
-  isWaitingVRF?:   boolean;  // VRF wait: bounce overlay on board; no per-tile wave
-  isHighlighted?:  boolean;  // blue glow when VRF bounce logo lands on this tile
-  isGameOver?:     boolean;  // fade unrevealed tiles to dark on loss
-  isWinReveal?:    boolean;  // flip unrevealed tiles to white on win
-  explosionPhase?: ExplosionPhase;  // mine explosion sequence: pending | exploding | exploded
-  isShaking?:      boolean;  // subtle shake (random tiles during play)
+  index:             number;
+  cols:              number;
+  state:             TileState;
+  adjacentCount?:   number;
+  onClick:           (index: number) => void;
+  disabled:          boolean;
+  isCashout?:       boolean;  // pulse hint: player can cash out
+  isWaitingVRF?:    boolean;  // VRF wait: grey + fly animation (use with flyDirection)
+  flyDirection?:    TileFlyDirection;  // when isWaitingVRF: direction for fly-off-and-back
+  isHighlighted?:   boolean;  // blue glow when VRF bounce logo lands on this tile
+  isGameOver?:      boolean;  // fade unrevealed tiles to dark on loss
+  isWinReveal?:     boolean;  // flip unrevealed tiles to white on win
+  explosionPhase?:  ExplosionPhase;  // mine explosion sequence: pending | exploding | exploded
+  isShaking?:       boolean;  // subtle shake (random tiles during play)
   burstOrderIndex?: number | null;  // index in burst reveal order (0-based), null if not in burst
-  currentBurstIndex?: number;       // current step in burst sequence
+  currentBurstIndex?: number;  // current step in burst sequence
 }
 
 // Classic minesweeper number colors — tuned for light (white) tile background
@@ -42,6 +43,7 @@ export function Tile({
   disabled,
   isCashout       = false,
   isWaitingVRF    = false,
+  flyDirection,
   isHighlighted   = false,
   isGameOver      = false,
   isWinReveal     = false,
@@ -54,6 +56,16 @@ export function Tile({
   const showAsPending = state === "pending" || (inBurstList && currentBurstIndex < burstOrderIndex);
   const showBurstReveal = inBurstList && currentBurstIndex === burstOrderIndex;
   const showRevealedAfterBurst = inBurstList && currentBurstIndex > burstOrderIndex;
+  const flyClass =
+    flyDirection === "left"
+      ? "animate-tile-fly-left"
+      : flyDirection === "right"
+        ? "animate-tile-fly-right"
+        : flyDirection === "up"
+          ? "animate-tile-fly-up"
+          : flyDirection === "down"
+            ? "animate-tile-fly-down"
+            : "";
   const handleClick = () => {
     if (!disabled && state === "unrevealed") {
       onClick(index);
@@ -112,6 +124,20 @@ export function Tile({
     );
   }
 
+  // ── Waiting for VRF: grey tile, fly off-and-back (direction from parent)
+  if (isWaitingVRF && flyDirection && state === "unrevealed") {
+    return (
+      <div
+        className={`
+          rounded-[3px] w-full aspect-square
+          bg-gray-400 border border-gray-500/50 opacity-80 cursor-not-allowed
+          ${flyClass}
+        `}
+        aria-hidden
+      />
+    );
+  }
+
   // ── Pending look: shake + grow to 1.1 (clicked, waiting for tx or waiting in burst queue)
   if (showAsPending) {
     return (
@@ -127,18 +153,33 @@ export function Tile({
     );
   }
 
-  // ── Mine (single reveal, or burst reveal in order)
+  // ── Mine (single reveal, or burst reveal with puff then reveal)
   if (state === "mine") {
+    if (showBurstReveal) {
+      return (
+        <div style={{ perspective: "600px" }} className="relative w-full aspect-square">
+          <div
+            className="absolute inset-0 rounded-[3px] bg-base-blue border border-blue-400/25 animate-tile-puff"
+            aria-hidden
+          />
+          <div
+            className="relative flex items-center justify-center w-full h-full rounded-[3px] bg-mine shadow-tile-mine border border-red-300/30 opacity-0 animate-reveal-after-puff"
+          >
+            <BaseMineIcon size={24} />
+          </div>
+        </div>
+      );
+    }
     return (
       <div style={{ perspective: "600px" }}>
         <div
-          className={`
+          className="
             relative flex items-center justify-center
             rounded-[3px] w-full aspect-square
             bg-mine shadow-tile-mine cursor-default
             border border-red-300/30
-            ${showBurstReveal ? "animate-tile-burst" : "animate-mine-reveal"}
-          `}
+            animate-mine-reveal
+          "
         >
           <BaseMineIcon size={24} />
         </div>
@@ -146,19 +187,38 @@ export function Tile({
     );
   }
 
-  // ── Safe (revealed, or burst reveal in order)
+  // ── Safe (revealed, or burst reveal with puff then reveal)
   if (state === "safe") {
     const n = adjacentCount ?? 0;
+    if (showBurstReveal) {
+      return (
+        <div style={{ perspective: "600px" }} className="relative w-full aspect-square">
+          <div
+            className="absolute inset-0 rounded-[3px] bg-base-blue border border-blue-400/25 animate-tile-puff"
+            aria-hidden
+          />
+          <div
+            className="relative flex items-center justify-center w-full h-full rounded-[3px] bg-neutral-100 border border-neutral-300/60 shadow-tile-safe opacity-0 animate-reveal-after-puff"
+          >
+            {n > 0 && (
+              <span className={`text-xs font-bold font-mono select-none ${NUMBER_COLORS[n]}`}>
+                {n}
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    }
     return (
       <div style={{ perspective: "600px" }}>
         <div
-          className={`
+          className="
             relative flex items-center justify-center
             rounded-[3px] w-full aspect-square
             bg-neutral-100 border border-neutral-300/60
             shadow-tile-safe cursor-default
-            ${showBurstReveal ? "animate-tile-burst" : "animate-tile-flip"}
-          `}
+            animate-tile-flip
+          "
         >
           {n > 0 && (
             <span className={`text-xs font-bold font-mono select-none ${NUMBER_COLORS[n]}`}>

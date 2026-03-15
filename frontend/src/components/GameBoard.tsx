@@ -31,18 +31,28 @@ function getMineIndices(mineBitmask: bigint, totalTiles: number): number[] {
   return out;
 }
 
-interface GameBoardProps {
-  gridSize:           number;
-  tileStates:         TileState[];
-  mineBitmask:        bigint;
-  status:             GameStatus;
-  onFlip:             (index: number) => void;
-  isCashout?:         boolean;
-  isFlipPending?:     boolean;  // true only when a flip tx is in flight (not during 50ms batch collection)
-  burstRevealOrder?:  number[];  // tile indices in click order for burst reveal
+export type TileFlyDirection = "left" | "right" | "up" | "down";
+
+export interface GameBoardProps {
+  gridSize:               number;
+  tileStates:             TileState[];
+  mineBitmask:            bigint;
+  status:                 GameStatus;
+  onFlip:                 (index: number) => void;
+  isCashout?:             boolean;
+  isFlipPending?:         boolean;  // true when flip tx in flight (after 50ms debounce)
+  waitingForVrfResponse?: boolean;  // first click made, VRF in-flight: disable all, grey, fly animation
+  burstRevealOrder?:      number[];  // tile indices in click order for burst reveal
   onBurstRevealComplete?: () => void;
-  mineHitTileIndex?:  number | null;
-  onExplosionComplete?: () => void;
+  mineHitTileIndex?:      number | null;
+  onExplosionComplete?:   () => void;
+}
+
+/** Deterministic per-tile fly direction (randomized per index). */
+function getFlyDirection(index: number): TileFlyDirection {
+  const dirs: TileFlyDirection[] = ["left", "right", "up", "down"];
+  const seed = (index * 1103515245 + 12345) & 0x7fffffff;
+  return dirs[seed % 4];
 }
 
 /** Count mines in the 8 neighbours of tile at `index` in a grid of width `cols`. */
@@ -82,6 +92,7 @@ export function GameBoard({
   onFlip,
   isCashout = false,
   isFlipPending = false,
+  waitingForVrfResponse = false,
   burstRevealOrder = [],
   onBurstRevealComplete,
   mineHitTileIndex = null,
@@ -93,6 +104,9 @@ export function GameBoard({
   const isWaitingVRF = status === GameStatus.WAITING_VRF;
   const isGameOver   = status === GameStatus.GAME_OVER;
   const isWinReveal  = status === GameStatus.CASHED_OUT;
+
+  // When waiting for VRF: all tiles disabled, greyed, and play fly animation
+  const tilesGreyedAndFly = waitingForVrfResponse;
 
   const [explodingTiles, setExplodingTiles] = useState<Set<number>>(new Set());
   const [explodedTiles, setExplodedTiles]   = useState<Set<number>>(new Set());
@@ -222,6 +236,11 @@ export function GameBoard({
       >
         {tileStates.map((state, i) => {
           const burstIdx = burstRevealOrder.indexOf(i);
+          const disabled =
+            waitingForVrfResponse ||
+            !active ||
+            state !== "unrevealed" ||
+            isFlipPending;
           return (
             <Tile
               key={i}
@@ -234,9 +253,10 @@ export function GameBoard({
                   : undefined
               }
               onClick={onFlip}
-              disabled={!active || state !== "unrevealed" || isFlipPending}
+              disabled={disabled}
               isCashout={isCashout && active}
-              isWaitingVRF={isWaitingVRF && state === "unrevealed"}
+              isWaitingVRF={tilesGreyedAndFly && state === "unrevealed"}
+              flyDirection={tilesGreyedAndFly && state === "unrevealed" ? getFlyDirection(i) : undefined}
               isHighlighted={false}
               isGameOver={isGameOver && state === "unrevealed"}
               isWinReveal={isWinReveal && state === "unrevealed"}

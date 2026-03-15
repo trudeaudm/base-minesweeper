@@ -678,6 +678,10 @@ export function useGame() {
     (pendingTile !== null || isFlipInFlight) &&
     !(gameState.isActive && (pendingTiles.length > 0 || pendingTilesRef.current.length > 0));
 
+  // From the moment the first tile is clicked until VRF returns: disable all tiles, grey out, show fly animation
+  const waitingForVrfResponse =
+    (gameState.isWaitingFirstFlip && pendingTile !== null) || gameState.isWaitingVRF;
+
   return {
     gameState,
     isStarting,
@@ -687,6 +691,7 @@ export function useGame() {
     pendingTiles,
     isFlipPending,
     isFlipInFlight,
+    waitingForVrfResponse,
     burstRevealOrder,
     onBurstRevealComplete,
     error,

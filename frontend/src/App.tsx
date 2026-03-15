@@ -6,6 +6,7 @@ import { GameSelect } from "@/components/GameSelect";
 import { GameBoard } from "@/components/GameBoard";
 import { GameStatusBar } from "@/components/GameStatus";
 import { WinScreen } from "@/components/WinScreen";
+import { GameOverScreen } from "@/components/GameOverScreen";
 import { useGame } from "@/hooks/useGame";
 import { usePoolHealth } from "@/hooks/usePoolHealth";
 import { GameStatus } from "@/lib/config";
@@ -25,6 +26,7 @@ function GameApp() {
     cancelThresholdBlocks,
     pendingTile,
     isFlipPending,
+    waitingForVrfResponse,
     burstRevealOrder,
     onBurstRevealComplete,
     mineHitTileIndex,
@@ -124,6 +126,7 @@ function GameApp() {
               onFlip={flipTile}
               isCashout={gameState.safeRevealed > 0 && gameState.isActive}
               isFlipPending={isFlipPending}
+              waitingForVrfResponse={waitingForVrfResponse}
               burstRevealOrder={burstRevealOrder}
               onBurstRevealComplete={onBurstRevealComplete}
               mineHitTileIndex={mineHitTileIndex}
@@ -161,6 +164,16 @@ function GameApp() {
       {gameState.isCashedOut && (
         <WinScreen
           payout={gameState.currentPayout > 0n ? gameState.currentPayout : gameState.maxPayout}
+          entryFee={gameState.entryFee}
+          gridSize={gameState.gridSize}
+          difficulty={gameState.difficulty}
+          onPlayAgain={resetGame}
+        />
+      )}
+
+      {/* Game over (RUGGED) overlay */}
+      {gameState.isGameOver && !gameState.isCashedOut && (
+        <GameOverScreen
           entryFee={gameState.entryFee}
           gridSize={gameState.gridSize}
           difficulty={gameState.difficulty}
