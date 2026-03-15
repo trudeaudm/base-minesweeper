@@ -371,6 +371,15 @@ export function useGame() {
         const started = logs.find(l => l.eventName === "GameStarted");
         if (started) {
           const gameId = (started.args as { gameId: bigint }).gameId;
+          setPendingTile(null);
+          setPendingTiles([]);
+          pendingTilesRef.current = [];
+          setTilesLockedForFlip(false);
+          setIsFlipInFlight(false);
+          if (batchTimerRef.current) {
+            clearTimeout(batchTimerRef.current);
+            batchTimerRef.current = null;
+          }
           setGameState(prev => ({
             ...prev,
             gameId,
@@ -662,6 +671,15 @@ export function useGame() {
     setBurstRevealOrder([]);
     lastFlipClickOrderRef.current = [];
     setError(null);
+    setPendingTile(null);
+    setPendingTiles([]);
+    pendingTilesRef.current = [];
+    setTilesLockedForFlip(false);
+    setIsFlipInFlight(false);
+    if (batchTimerRef.current) {
+      clearTimeout(batchTimerRef.current);
+      batchTimerRef.current = null;
+    }
     clearSessionKey();
     refetchActiveGame();
   }, [refetchActiveGame]);
