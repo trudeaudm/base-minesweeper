@@ -279,6 +279,7 @@ export function useGame() {
       , sessionKey, gridSize, difficulty, entryFee,
       maxPayout, revealedMineBitmask, revealedBitmask,
       safeRevealed, totalSafe, statusNum, startBlock, startedAt,
+      , // endedAt — not used in frontend
       revealedAdjacencyRaw,
     ] = rawGame;
     const mineBitmask = revealedMineBitmask;
