@@ -275,9 +275,10 @@ export function useGame() {
 
     const [
       , sessionKey, gridSize, difficulty, entryFee,
-      maxPayout, mineBitmask, revealedBitmask,
+      maxPayout, revealedMineBitmask, revealedBitmask,
       safeRevealed, totalSafe, statusNum, startBlock, startedAt,
     ] = rawGame;
+    const mineBitmask = revealedMineBitmask;
 
     const status     = statusNum as GameStatus;
     const totalTiles = gridInfo?.[gridSize as 0|1|2]?.totalTiles ?? 0;

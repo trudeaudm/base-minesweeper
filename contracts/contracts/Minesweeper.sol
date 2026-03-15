@@ -98,7 +98,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         uint256  entryFee;
         uint256  maxPayout;       // reserved amount (entryFee × maxPayoutBPS / BPS_DENOM)
         uint8    safeTileIndex;   // tile chosen by the player on first click (guaranteed safe)
-        uint64   mineBitmask;     // bit i = 1 means tile i is a mine (set in firstFlip)
+        uint64   revealedMineBitmask; // only mines that have been revealed (0 until revealed); used by getGame() during active play
         uint64   revealedBitmask; // bit i = 1 means tile i was revealed
         uint8    safeRevealed;    // count of safe tiles revealed
         uint8    totalSafe;       // totalTiles - mineCount
@@ -112,6 +112,9 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
 
     uint256 public nextGameId = 1;
     mapping(uint256 => Game) public games;
+
+    // gameId → full mine layout (private; not exposed until game ends)
+    mapping(uint256 => uint64) private _mineBitmask;
 
     // vrfRequestId → gameId
     mapping(uint256 => uint256) public vrfRequestToGame;
@@ -316,23 +319,23 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         // Create game record – status WAITING_VRF; request VRF immediately
         gameId = nextGameId++;
         games[gameId] = Game({
-            player:           msg.sender,
-            sessionKey:       sessionKey,
-            gridSize:         gridSize,
-            difficulty:       difficulty,
-            entryFee:         cfg.entryFee,
-            maxPayout:        maxPayout,
-            safeTileIndex:    0,
-            mineBitmask:      0,
-            revealedBitmask:  0,
-            safeRevealed:     0,
-            totalSafe:        totalSafe,
-            status:           GameStatus.WAITING_VRF,
-            vrfRequestId:     0,
-            vrfRandomness:    0,
-            startBlock:       block.number,
-            startedAt:        block.timestamp,
-            endedAt:          0
+            player:                msg.sender,
+            sessionKey:            sessionKey,
+            gridSize:              gridSize,
+            difficulty:            difficulty,
+            entryFee:              cfg.entryFee,
+            maxPayout:             maxPayout,
+            safeTileIndex:         0,
+            revealedMineBitmask:   0,
+            revealedBitmask:       0,
+            safeRevealed:          0,
+            totalSafe:             totalSafe,
+            status:                GameStatus.WAITING_VRF,
+            vrfRequestId:          0,
+            vrfRandomness:         0,
+            startBlock:            block.number,
+            startedAt:             block.timestamp,
+            endedAt:               0
         });
 
         playerActiveGame[msg.sender] = gameId;
@@ -389,7 +392,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         uint8 mineCount  = mineCounts[gridSize][g.difficulty];
 
         // Place mines using stored VRF randomness; first tile is guaranteed safe
-        g.mineBitmask = _generateMines(g.vrfRandomness, totalTiles, mineCount, tileIndex);
+        _mineBitmask[gameId] = _generateMines(g.vrfRandomness, totalTiles, mineCount, tileIndex);
 
         // Reveal the first (guaranteed safe) tile and transition to ACTIVE
         g.revealedBitmask = uint64(1) << tileIndex;
@@ -417,7 +420,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         require(tileIndex < gridConfigs[g.gridSize].totalTiles, "Tile out of range");
         require((g.revealedBitmask >> tileIndex) & 1 == 0, "Tile already revealed");
 
-        bool isMine = (g.mineBitmask >> tileIndex) & 1 == 1;
+        bool isMine = (_mineBitmask[gameId] >> tileIndex) & 1 == 1;
 
         if (isMine) {
             _endGame(gameId, tileIndex, GameStatus.GAME_OVER);
@@ -463,7 +466,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
             if (tileIndex >= totalTiles) continue;
             if ((g.revealedBitmask >> tileIndex) & 1 == 1) continue;
 
-            bool isMine = (g.mineBitmask >> tileIndex) & 1 == 1;
+            bool isMine = (_mineBitmask[gameId] >> tileIndex) & 1 == 1;
 
             if (isMine) {
                 _endGame(gameId, tileIndex, GameStatus.GAME_OVER);
@@ -524,6 +527,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
 
     function _endGame(uint256 gameId, uint8 mineTile, GameStatus status) internal {
         Game storage g = games[gameId];
+        g.revealedMineBitmask |= uint64(1) << mineTile;
         g.status  = status;
         g.endedAt = block.timestamp;
 
@@ -532,7 +536,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         _releaseGame(gameId, g.gridSize, g.maxPayout, 0, g.player);
 
         emit TileRevealed(gameId, msg.sender, mineTile, true, g.safeRevealed, 0);
-        emit GameOver(gameId, g.player, mineTile, g.mineBitmask);
+        emit GameOver(gameId, g.player, mineTile, _mineBitmask[gameId]);
     }
 
     function _releaseGame(
@@ -672,6 +676,11 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         )
     {
         Game storage g = games[gameId];
+        // During active play expose only revealed mines; at game end expose full layout
+        uint64 exposedBitmask =
+            (g.status == GameStatus.GAME_OVER || g.status == GameStatus.CASHED_OUT)
+                ? _mineBitmask[gameId]
+                : g.revealedMineBitmask;
         return (
             g.player,
             g.sessionKey,
@@ -679,7 +688,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
             g.difficulty,
             g.entryFee,
             g.maxPayout,
-            g.mineBitmask,
+            exposedBitmask,
             g.revealedBitmask,
             g.safeRevealed,
             g.totalSafe,
