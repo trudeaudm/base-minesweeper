@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { Header } from "@/components/Header";
 import { LandingHero } from "@/components/LandingHero";
@@ -42,6 +42,17 @@ function GameApp() {
   const { pool } = usePoolHealth();
 
   const [cancelledMessage, setCancelledMessage] = useState<string | null>(null);
+  const [boardFadeComplete, setBoardFadeComplete] = useState(false);
+
+  // When real board data becomes ready, crossfade from loading grid to board over 300ms
+  useEffect(() => {
+    if (!isGameDataReady) {
+      setBoardFadeComplete(false);
+      return;
+    }
+    const id = setTimeout(() => setBoardFadeComplete(true), 300);
+    return () => clearTimeout(id);
+  }, [isGameDataReady]);
 
   const hasGame = gameState.gameId !== null;
   const view: AppView = hasGame ? "playing" : "select";
@@ -188,23 +199,74 @@ function GameApp() {
                   isCancelling={isCancelling}
                 />
 
-                {/* Game grid — only rendered when isGameDataReady so dimensions and data are correct */}
-                <GameBoard
-                  gridSize={gameState.gridSize}
-                  tileStates={gameState.tileStates}
-                  mineBitmask={gameState.mineBitmask}
-                  revealedAdjacency={gameState.revealedAdjacency}
-                  status={gameState.status}
-                  onFlip={flipTile}
-                  isCashout={gameState.safeRevealed > 0 && gameState.isActive}
-                  pendingTilesRef={pendingTilesRef}
-                  isFlipPending={isFlipPending}
-                  burstRevealOrder={burstRevealOrder}
-                  onBurstRevealComplete={onBurstRevealComplete}
-                  mineHitTileIndex={mineHitTileIndex}
-                  onExplosionComplete={onExplosionComplete}
-                  explosionComplete={explosionComplete}
-                />
+                {/* Crossfade: loading grid fades out (300ms) while real board fades in; same space, no layout shift */}
+                <div className="w-full max-w-xs mx-auto relative">
+                  {/* Loading placeholder — stays mounted during fade so fly animation can finish */}
+                  <div
+                    className={`grid gap-1.5 w-full pointer-events-none transition-opacity duration-300 ${
+                      boardFadeComplete ? "opacity-0" : "opacity-100"
+                    }`}
+                    style={{
+                      gridTemplateColumns: `repeat(${GRID_LAYOUT[gameState.gridSize as 0 | 1 | 2].cols}, 1fr)`,
+                    }}
+                    role="presentation"
+                    aria-hidden
+                  >
+                    {Array.from(
+                      {
+                        length:
+                          GRID_LAYOUT[gameState.gridSize as 0 | 1 | 2].rows *
+                          GRID_LAYOUT[gameState.gridSize as 0 | 1 | 2].cols,
+                      },
+                      (_, i) => {
+                        const dirs = ["left", "right", "up", "down"] as const;
+                        const seed = (i * 1103515245 + 12345) & 0x7fffffff;
+                        const dir = dirs[seed % 4];
+                        const flyClass =
+                          dir === "left"
+                            ? "animate-tile-fly-left"
+                            : dir === "right"
+                              ? "animate-tile-fly-right"
+                              : dir === "up"
+                                ? "animate-tile-fly-up"
+                                : "animate-tile-fly-down";
+                        return (
+                          <div
+                            key={i}
+                            className={`
+                              rounded-[3px] w-full aspect-square
+                              bg-base-blue border border-blue-400/25 shadow-tile
+                              ${flyClass}
+                            `}
+                          />
+                        );
+                      }
+                    )}
+                  </div>
+                  {/* Real board — fades in over same area */}
+                  <div
+                    className={`absolute inset-0 transition-opacity duration-300 ${
+                      boardFadeComplete ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+                    }`}
+                  >
+                    <GameBoard
+                      gridSize={gameState.gridSize}
+                      tileStates={gameState.tileStates}
+                      mineBitmask={gameState.mineBitmask}
+                      revealedAdjacency={gameState.revealedAdjacency}
+                      status={gameState.status}
+                      onFlip={flipTile}
+                      isCashout={gameState.safeRevealed > 0 && gameState.isActive}
+                      pendingTilesRef={pendingTilesRef}
+                      isFlipPending={isFlipPending}
+                      burstRevealOrder={burstRevealOrder}
+                      onBurstRevealComplete={onBurstRevealComplete}
+                      mineHitTileIndex={mineHitTileIndex}
+                      onExplosionComplete={onExplosionComplete}
+                      explosionComplete={explosionComplete}
+                    />
+                  </div>
+                </div>
 
                 {/* Session key indicator — hide when game over */}
                 {gameState.sessionKeyAddr && !gameState.isGameOver && (

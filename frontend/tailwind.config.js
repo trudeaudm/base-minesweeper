@@ -42,9 +42,12 @@ export default {
         "tile-fly-right":  "tileFlyRight 2s ease-in-out infinite",
         "tile-fly-up":     "tileFlyUp 2s ease-in-out infinite",
         "tile-fly-down":   "tileFlyDown 2s ease-in-out infinite",
-        "rugged-slide-in": "ruggedSlideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards",
+        "rugged-slide-in": "ruggedSlideIn 0.42s cubic-bezier(0.22, 1.2, 0.36, 1) forwards",
+        "rugged-impact-shake": "ruggedImpactShake 0.18s ease-out 0.42s forwards",
         "rugged-letter-explode": "ruggedLetterExplode 0.4s ease-out forwards",
+        "rugged-particle": "ruggedParticle 0.5s ease-out forwards",
         "reveal-after-puff": "revealAfterPuff 0.2s ease-out 0.35s forwards",
+        "payout-scale-in": "payoutScaleIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards",
       },
       keyframes: {
         vrfBarSpin: {
@@ -162,20 +165,46 @@ export default {
           "50%":  { transform: "scale(1.4)", opacity: "0.6", filter: "blur(2px)" },
           "100%": { transform: "scale(1.5)", opacity: "0", filter: "blur(4px)" },
         },
-        // ── RUGGED: word slides in from off-screen
+        // ── RUGGED: slam in from above with overshoot bounce, then brief screen shake
         ruggedSlideIn: {
-          "0%":   { transform: "translateY(-120%)", opacity: "0" },
-          "100%": { transform: "translateY(0)", opacity: "1" },
+          "0%":   { transform: "scale(1.4) translateY(-85%)", opacity: "0.9" },
+          "70%":  { transform: "scale(1.02) translateY(2%)", opacity: "1" },
+          "85%":  { transform: "scale(1) translateY(0)", opacity: "1" },
+          "100%": { transform: "scale(1) translateY(0)", opacity: "1" },
         },
-        // ── RUGGED: single letter explodes into pixels
+        ruggedImpactShake: {
+          "0%, 100%": { transform: "translate(0, 0)" },
+          "20%":      { transform: "translate(-5px, 2px)" },
+          "40%":      { transform: "translate(4px, -3px)" },
+          "60%":      { transform: "translate(-4px, 2px)" },
+          "80%":      { transform: "translate(3px, -1px)" },
+        },
+        // ── RUGGED: single letter explodes (opacity out); particles rendered separately
         ruggedLetterExplode: {
           "0%":   { transform: "scale(1)", opacity: "1" },
-          "100%": { transform: "scale(2)", opacity: "0" },
+          "100%": { transform: "scale(1.8)", opacity: "0" },
+        },
+        // ── RUGGED: particle flies out with arc (--dx, --dy final position; more drop in second half)
+        ruggedParticle: {
+          "0%":   { transform: "translate(0, 0) scale(1)", opacity: "1" },
+          "50%":  {
+            transform: "translate(calc(var(--dx) * 0.5), calc(var(--dy) * 0.35)) scale(var(--scale, 1))",
+            opacity: "0.85",
+          },
+          "100%": {
+            transform: "translate(var(--dx), var(--dy)) scale(var(--scale, 1))",
+            opacity: "0",
+          },
         },
         // ── Reveal content after puff (opacity in after delay)
         revealAfterPuff: {
           "0%":   { opacity: "0" },
           "100%": { opacity: "1" },
+        },
+        // ── Win screen: payout number scale-up entrance
+        payoutScaleIn: {
+          "0%":   { transform: "scale(0.5)", opacity: "0" },
+          "100%": { transform: "scale(1)", opacity: "1" },
         },
       },
       boxShadow: {

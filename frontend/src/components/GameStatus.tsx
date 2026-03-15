@@ -64,22 +64,32 @@ export function GameStatusBar({
   return (
     <div className="w-full max-w-xs mx-auto space-y-3">
       {/* Grid info row */}
-      <div className="flex items-center justify-between text-xs text-gray-600">
+      <div className="flex items-center justify-between text-xs text-gray-500">
         <span className="font-mono">
           {gridLabel} &nbsp;·&nbsp;
           <span className={diffInfo.color}>{diffInfo.label}</span>
         </span>
-        <span className="font-mono">
-          Entry: <span className="text-[#111111]">{formatEth(entryFee, 4)} ETH</span>
-          <span className="text-gray-500"> + 0.0001 ETH gas</span>
+        <span
+          className="font-mono text-[10px] text-gray-400"
+          title="Entry fee plus ~0.0001 ETH gas reserve for session key"
+        >
+          Entry {formatEth(entryFee, 4)} ETH
         </span>
       </div>
 
-      {/* Progress bar */}
-      <div>
-        <div className="flex justify-between text-xs text-gray-500 mb-1">
-          <span>{safeRevealed} / {totalSafe} safe tiles</span>
-          <span>{progressPct.toFixed(0)}%</span>
+      {/* Progress bar — fraction only, no "safe tiles" label; tooltip for accessibility */}
+      <div
+        className="mb-0.5"
+        role="progressbar"
+        aria-valuenow={safeRevealed}
+        aria-valuemin={0}
+        aria-valuemax={totalSafe}
+        aria-label={`Safe tiles revealed: ${safeRevealed} of ${totalSafe}`}
+        title={`${safeRevealed} / ${totalSafe} safe tiles (${progressPct.toFixed(0)}%)`}
+      >
+        <div className="flex justify-between text-xs mb-1">
+          <span className="text-gray-400 font-mono tabular-nums">{safeRevealed} / {totalSafe}</span>
+          <span className="text-gray-400 tabular-nums">{progressPct.toFixed(0)}%</span>
         </div>
         <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
           <div
@@ -89,20 +99,20 @@ export function GameStatusBar({
         </div>
       </div>
 
-      {/* Multiplier display */}
+      {/* Multiplier and current win — labels small/muted, values dominant */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-xs text-gray-500 uppercase tracking-widest">Multiplier</div>
+          <div className="text-[10px] text-gray-400 uppercase tracking-wider">Multiplier</div>
           <div className={`text-3xl font-bold font-mono ${multiplierColor} transition-colors`}>
             {multiplier > 0 ? `${multiplier.toFixed(2)}×` : "0.00×"}
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xs text-gray-500 uppercase tracking-widest">Current win</div>
+          <div className="text-[10px] text-gray-400 uppercase tracking-wider">Current win</div>
           <div className="text-xl font-mono font-semibold text-[#111111]">
             {formatEth(currentPayout, 5)} ETH
           </div>
-          <div className="text-xs text-gray-500 font-mono">
+          <div className="text-[10px] text-gray-400 font-mono">
             max {formatEth(maxPayout, 5)} ETH
           </div>
         </div>

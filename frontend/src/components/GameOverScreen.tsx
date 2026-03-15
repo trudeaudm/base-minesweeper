@@ -10,13 +10,34 @@ interface GameOverProps {
 
 const RUGGED_LETTERS = ["R", "U", "G", "G", "E", "D"] as const;
 
-/** Random stagger delay (ms) for each letter explode — slight offset so not simultaneous. */
+const EXPLODE_STAGGER_MS = 120;
+const EXPLODE_DURATION_MS = 400;
+const EXPLODE_BASE_DELAY_MS = 520; // after entrance + impact shake
+
+/** Stagger delay (ms) for each letter to start exploding — at least 120ms between letters. */
 function getLetterExplodeDelay(index: number): number {
-  const base = 600; // after slide-in settles
-  const perLetter = 120 + (index * 37) % 80;
-  const jitter = (index * 1103515245 + 12345) & 0xff;
-  return base + index * perLetter + (jitter % 90);
+  return EXPLODE_BASE_DELAY_MS + index * EXPLODE_STAGGER_MS;
 }
+
+/** Deterministic particle offsets for a letter index (spread 1.5x, gravity bias). */
+function getParticleOffsets(letterIndex: number, count: number): { dx: number; dy: number; scale: number }[] {
+  const out: { dx: number; dy: number; scale: number }[] = [];
+  const spread = 90; // 50% more than ~60; particles travel further
+  const gravityBias = 38;
+  for (let i = 0; i < count; i++) {
+    const seed = (letterIndex * 7919 + i * 1103515245 + 12345) & 0x7fffffff;
+    const angle = (seed / 0x7fffffff) * Math.PI * 2;
+    const dist = (seed % 1000) / 1000 * spread + spread * 0.4;
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist + gravityBias; // arc downward
+    const scale = 0.7 + (seed % 300) / 300 * 0.8; // 0.7–1.5
+    out.push({ dx, dy, scale });
+  }
+  return out;
+}
+
+const PARTICLE_COUNT_PER_LETTER = 32;
+const PARTICLE_SIZE_PX = 5;
 
 function GameOverScreenComponent({ gridSize, difficulty, onPlayAgain }: GameOverProps) {
   const [show, setShow] = useState(false);
@@ -31,7 +52,7 @@ function GameOverScreenComponent({ gridSize, difficulty, onPlayAgain }: GameOver
     return () => clearTimeout(t);
   }, []);
 
-  // After overlay is visible, trigger each letter to explode with random stagger
+  // After overlay is visible, trigger each letter to explode with 120ms stagger, 400ms duration each
   useEffect(() => {
     if (!show) return;
     const lastIndex = RUGGED_LETTERS.length - 1;
@@ -49,13 +70,12 @@ function GameOverScreenComponent({ gridSize, difficulty, onPlayAgain }: GameOver
           return next;
         });
         setExplodedLetters((prev) => new Set(prev).add(i));
-      }, delay + 400);
+      }, delay + EXPLODE_DURATION_MS);
       timeoutsRef.current.push(endId);
     });
-    // When last letter has finished exploding, mark complete and remove overlay from DOM (BUG 3: no leftover label)
     const cleanupId = setTimeout(() => {
       setAnimationComplete(true);
-    }, lastDelay + 400 + 50);
+    }, lastDelay + EXPLODE_DURATION_MS + 50);
     timeoutsRef.current.push(cleanupId);
     return () => {
       timeoutsRef.current.forEach(clearTimeout);
@@ -73,32 +93,63 @@ function GameOverScreenComponent({ gridSize, difficulty, onPlayAgain }: GameOver
   return (
     <div
       className={`
-        fixed inset-0 z-40 pointer-events-none flex flex-col items-center justify-center
+        fixed inset-0 z-40 pointer-events-none flex flex-col items-center justify-center animate-rugged-impact-shake
         transition-opacity duration-500
         ${show ? "opacity-100" : "opacity-0"}
       `}
       style={{ background: "transparent" }}
       aria-hidden
     >
-      {/* RUGGED: flies in then each letter explodes with stagger */}
+      {/* RUGGED: slams in then each letter explodes with stagger; particles per letter */}
       <div className="flex justify-center overflow-visible">
         <h1
           className="inline-flex text-6xl sm:text-7xl font-black tracking-tighter text-white animate-rugged-slide-in drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
           style={{ fontFamily: "Coinbase Sans, Inter, sans-serif", textShadow: "0 2px 12px rgba(0,0,0,0.9)" }}
         >
-          {RUGGED_LETTERS.map((letter, i) => (
-            <span
-              key={i}
-              className={`
-                inline-block
-                ${explodedLetters.has(i) ? "invisible" : ""}
-                ${explodingLetters.has(i) ? "animate-rugged-letter-explode" : ""}
-              `}
-              style={{ minWidth: "0.5em", textAlign: "center" }}
-            >
-              {letter}
-            </span>
-          ))}
+          {RUGGED_LETTERS.map((letter, i) => {
+            const particles = getParticleOffsets(i, PARTICLE_COUNT_PER_LETTER);
+            const isExploding = explodingLetters.has(i);
+            return (
+              <span
+                key={i}
+                className="inline-block relative"
+                style={{ minWidth: "0.5em", textAlign: "center" }}
+              >
+                {/* Letter (fades/scales out when exploding) */}
+                <span
+                  className={`
+                    inline-block
+                    ${explodedLetters.has(i) ? "invisible" : ""}
+                    ${isExploding ? "animate-rugged-letter-explode" : ""}
+                  `}
+                >
+                  {letter}
+                </span>
+                {/* Pixel particles when this letter explodes */}
+                {isExploding && (
+                  <span className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden>
+                    {particles.map((p, j) => (
+                      <span
+                        key={j}
+                        className="absolute rounded-sm bg-white/90 animate-rugged-particle"
+                        style={{
+                          width: PARTICLE_SIZE_PX,
+                          height: PARTICLE_SIZE_PX,
+                          left: "50%",
+                          top: "50%",
+                          marginLeft: -PARTICLE_SIZE_PX / 2,
+                          marginTop: -PARTICLE_SIZE_PX / 2,
+                          ["--dx" as string]: `${p.dx}px`,
+                          ["--dy" as string]: `${p.dy}px`,
+                          ["--scale" as string]: p.scale,
+                        }}
+                      />
+                    ))}
+                  </span>
+                )}
+              </span>
+            );
+          })}
         </h1>
       </div>
       {/* Optional small label so overlay context is clear; still no background */}

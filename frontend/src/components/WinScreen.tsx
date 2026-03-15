@@ -93,9 +93,16 @@ interface WinScreenProps {
   onPlayAgain: () => void;
 }
 
+const PAYOUT_COUNT_UP_MS = 800;
+
+function easeOutCubic(t: number): number {
+  return 1 - (1 - t) ** 3;
+}
+
 function WinScreenComponent({ payout, entryFee, gridSize, difficulty, onPlayAgain }: WinScreenProps) {
   const [show,         setShow]         = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [displayPayout, setDisplayPayout] = useState<bigint>(0n);
 
   const multiplier = entryFee > 0n ? Number(payout * 10000n / entryFee) / 10000 : 0;
 
@@ -105,12 +112,27 @@ function WinScreenComponent({ payout, entryFee, gridSize, difficulty, onPlayAgai
   const gridLabel = info?.label ?? "…";
 
   useEffect(() => {
-    // Delay the overlay so the win-tile wave on the board plays first (~700 ms),
-    // then fire confetti as the overlay peaks in opacity.
     const t1 = setTimeout(() => setShow(true),         700);
     const t2 = setTimeout(() => setShowConfetti(true), 1050);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
+
+  // Count up payout from 0 to final value over 800ms with ease-out cubic (when overlay is shown)
+  useEffect(() => {
+    if (!show) return;
+    const start = performance.now();
+    const payoutNum = Number(payout);
+    let rafId: number;
+    const tick = (now: number) => {
+      const elapsed = now - start;
+      const progress = Math.min(1, elapsed / PAYOUT_COUNT_UP_MS);
+      const eased = easeOutCubic(progress);
+      setDisplayPayout(BigInt(Math.floor(payoutNum * eased)));
+      if (progress < 1) rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [show, payout]);
 
   return (
     <>
@@ -141,11 +163,11 @@ function WinScreenComponent({ payout, entryFee, gridSize, difficulty, onPlayAgai
           {gridLabel} · <span className={diffInfo.color}>{diffInfo.label}</span>
         </p>
 
-        {/* Payout */}
+        {/* Payout — scale-up entrance, count up from 0 over 800ms */}
         <div className="text-center mb-8 animate-bounce-in">
           <div className="text-white/60 text-xs uppercase tracking-widest mb-1">Payout</div>
-          <div className="text-5xl font-mono font-bold text-white">
-            {formatEth(payout, 5)}
+          <div className="text-5xl font-mono font-bold text-white animate-payout-scale-in origin-center">
+            {formatEth(displayPayout, 5)}
           </div>
           <div className="text-white/80 text-xl font-mono mt-1">ETH</div>
           <div className="mt-3 inline-block px-4 py-1.5 bg-white/20 rounded-[6px]">
