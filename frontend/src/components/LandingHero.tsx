@@ -34,13 +34,13 @@ export function LandingHero() {
       {/* Feature bullets */}
       <div className="grid grid-cols-1 gap-3 mb-8 w-full max-w-xs">
         {[
-          { icon: "⚡", text: "Instant payouts via smart contract" },
-          { icon: "🔐", text: "Chainlink VRF randomness" },
-          { icon: "💸", text: "Cash out any time — no gas popup" },
-          { icon: "🏆", text: "Up to 1.9× your entry fee (by difficulty)" },
-        ].map(({ icon, text }) => (
+          { image: "/hero/Base-Bolt.png", text: "Instant payouts via smart contract" },
+          { image: "/hero/Base-Link.png", text: "Chainlink VRF randomness" },
+          { image: "/hero/Base-Money.png", text: "Cash out any time — no gas popup" },
+          { image: "/hero/Base-Stack.png", text: "Up to 1.9× your entry fee (by difficulty)" },
+        ].map(({ image, text }) => (
           <div key={text} className="flex items-center gap-3 text-left px-4 py-3 bg-gray-50 rounded-[4px]">
-            <span className="text-xl">{icon}</span>
+            <img src={image} alt="" className="w-6 h-6 shrink-0 object-contain" />
             <span className="text-gray-700 text-sm">{text}</span>
           </div>
         ))}
