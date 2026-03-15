@@ -39,33 +39,25 @@ export const DIFF_EASY   = 0;
 export const DIFF_NORMAL = 1;
 export const DIFF_HARD   = 2;
 
-// Grid metadata
-export const GRID_INFO = {
-  [GRID_SMALL]: {
-    label:      "5×4",
-    rows:       4,
-    cols:       5,
-    totalTiles: 20,
-    entryFee:   BigInt("1000000000000000"),  // 0.001 ETH
-    entryLabel: "0.001 ETH",
-  },
-  [GRID_MEDIUM]: {
-    label:      "5×6",
-    rows:       6,
-    cols:       5,
-    totalTiles: 30,
-    entryFee:   BigInt("5000000000000000"),  // 0.005 ETH
-    entryLabel: "0.005 ETH",
-  },
-  [GRID_LARGE]: {
-    label:      "5×10",
-    rows:       10,
-    cols:       5,
-    totalTiles: 50,
-    entryFee:   BigInt("10000000000000000"), // 0.01 ETH
-    entryLabel: "0.01 ETH",
-  },
+// Static grid layout (label, dimensions). Entry fees and totalTiles come from contract via useGridConfigs().
+export const GRID_LAYOUT = {
+  [GRID_SMALL]:  { label: "5×4",  rows: 4,  cols: 5 },
+  [GRID_MEDIUM]: { label: "5×6",  rows: 6,  cols: 5 },
+  [GRID_LARGE]:  { label: "5×10", rows: 10, cols: 5 },
 } as const;
+
+/** Per-grid info merged from GRID_LAYOUT + contract gridConfigs (use useGridConfigs() to get live data). */
+export type GridInfoEntry = {
+  label: string;
+  rows: number;
+  cols: number;
+  totalTiles: number;
+  entryFee: bigint;
+  entryLabel: string;
+  active: boolean;
+};
+
+export type GridInfo = Record<0 | 1 | 2, GridInfoEntry>;
 
 export const DIFF_INFO = {
   [DIFF_EASY]:   { label: "Easy",   color: "text-accent-green" },
@@ -95,12 +87,11 @@ export const MAX_PAYOUT_BPS_NORMAL = 17000n; // 1.7×
 export const MAX_PAYOUT_BPS_HARD   = 19000n; // 1.9×
 export const BPS_DENOMINATOR       = 10000n;
 
-/** Max payout in wei for a grid + difficulty (matches contract logic for isGridAvailable). */
-export function getMaxPayoutWei(gridSize: number, difficulty: number): bigint {
-  const cfg = GRID_INFO[gridSize as 0 | 1 | 2];
+/** Max payout in wei for a given entry fee and difficulty (matches contract logic). */
+export function getMaxPayoutWei(entryFee: bigint, difficulty: number): bigint {
   const bps = difficulty === DIFF_EASY ? MAX_PAYOUT_BPS_EASY
     : difficulty === DIFF_NORMAL ? MAX_PAYOUT_BPS_NORMAL : MAX_PAYOUT_BPS_HARD;
-  return (cfg.entryFee * bps) / BPS_DENOMINATOR;
+  return (entryFee * bps) / BPS_DENOMINATOR;
 }
 
 // Block-based cancellation: only before first flip (must match Minesweeper.sol)

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BaseLogo } from "./BaseLogo";
-import { formatEth, GRID_INFO, DIFF_INFO } from "@/lib/config";
+import { formatEth, DIFF_INFO } from "@/lib/config";
+import { useGridConfigs } from "@/hooks/useGridConfigs";
 
 // ── Confetti burst ────────────────────────────────────────────────────────────
 function Confetti() {
@@ -98,6 +99,11 @@ export function WinScreen({ payout, entryFee, gridSize, difficulty, onPlayAgain 
 
   const multiplier = entryFee > 0n ? Number(payout * 10000n / entryFee) / 10000 : 0;
 
+  const { gridInfo } = useGridConfigs();
+  const info     = gridInfo?.[gridSize as 0 | 1 | 2];
+  const diffInfo = DIFF_INFO[difficulty as 0 | 1 | 2];
+  const gridLabel = info?.label ?? "…";
+
   useEffect(() => {
     // Delay the overlay so the win-tile wave on the board plays first (~700 ms),
     // then fire confetti as the overlay peaks in opacity.
@@ -105,9 +111,6 @@ export function WinScreen({ payout, entryFee, gridSize, difficulty, onPlayAgain 
     const t2 = setTimeout(() => setShowConfetti(true), 1050);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
-
-  const info     = GRID_INFO[gridSize as 0 | 1 | 2];
-  const diffInfo = DIFF_INFO[difficulty as 0 | 1 | 2];
 
   return (
     <>
@@ -132,7 +135,7 @@ export function WinScreen({ payout, entryFee, gridSize, difficulty, onPlayAgain 
           You Won!
         </h1>
         <p className="text-white/70 text-sm mb-8">
-          {info.label} · <span className={diffInfo.color}>{diffInfo.label}</span>
+          {gridLabel} · <span className={diffInfo.color}>{diffInfo.label}</span>
         </p>
 
         {/* Payout */}

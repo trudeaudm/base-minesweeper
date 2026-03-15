@@ -2,7 +2,8 @@ import type { RefObject } from "react";
 import { useEffect, useState, useRef } from "react";
 import { Tile } from "./Tile";
 import { type TileState } from "@/hooks/useGame";
-import { GameStatus, GRID_INFO } from "@/lib/config";
+import { GameStatus } from "@/lib/config";
+import { useGridConfigs } from "@/hooks/useGridConfigs";
 
 // ─── Explosion sequence (easy to tweak) ─────────────────────────────────────
 const EXPLOSION_STAGGER_MS = 150;
@@ -103,7 +104,9 @@ export function GameBoard({
   onExplosionComplete,
   explosionComplete = true,
 }: GameBoardProps) {
-  const info = GRID_INFO[gridSize as 0 | 1 | 2];
+  const { gridInfo } = useGridConfigs();
+  const info = gridInfo?.[gridSize as 0 | 1 | 2];
+  if (!info) return null; // grid config not loaded yet
 
   const active       = status === GameStatus.ACTIVE || status === GameStatus.WAITING_FIRST_FLIP;
   const isWaitingVRF = status === GameStatus.WAITING_VRF;

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useGridAvailable, useMinPoolThresholds } from "@/hooks/usePoolHealth";
+import { useGridConfigs } from "@/hooks/useGridConfigs";
 import {
-  GRID_INFO,
+  type GridInfoEntry,
   DIFF_INFO,
   MINE_COUNTS,
   GRID_SMALL,
@@ -25,6 +26,7 @@ const DIFFS = [DIFF_EASY, DIFF_NORMAL, DIFF_HARD]   as const;
 function GridOption({
   gridSize,
   difficulty,
+  info,
   selected,
   onSelect,
   available,
@@ -32,15 +34,16 @@ function GridOption({
 }: {
   gridSize:          number;
   difficulty:        number;
+  info:              GridInfoEntry | undefined;
   selected:          boolean;
   onSelect:         () => void;
   available:         boolean;
   requiredPoolLabel: string;
 }) {
-  const info   = GRID_INFO[gridSize as 0 | 1 | 2];
   const mines  = MINE_COUNTS[gridSize as 0|1|2][difficulty as 0|1|2];
   const maxMulti = difficulty === 0 ? "1.5×" : difficulty === 1 ? "1.7×" : "1.9×";
 
+  if (!info) return null;
   return (
     <button
       onClick={onSelect}
@@ -83,6 +86,7 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
   const [selectedGrid, setSelectedGrid] = useState<number>(GRID_SMALL);
   const [selectedDiff, setSelectedDiff] = useState<number>(DIFF_NORMAL);
 
+  const { gridInfo, isLoading: gridConfigLoading } = useGridConfigs();
   const minPoolThresholds = useMinPoolThresholds();
   const availableSmall  = useGridAvailable(GRID_SMALL, selectedDiff);
   const availableMedium = useGridAvailable(GRID_MEDIUM, selectedDiff);
@@ -126,6 +130,7 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
               key={g}
               gridSize={g}
               difficulty={selectedDiff}
+              info={gridInfo?.[g]}
               selected={selectedGrid === g}
               onSelect={() => setSelectedGrid(g)}
               available={g === GRID_SMALL ? availableSmall : g === GRID_MEDIUM ? availableMedium : availableLarge}
@@ -172,7 +177,7 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
       {/* Start button */}
       <button
         onClick={() => onStart(selectedGrid, selectedDiff)}
-        disabled={!available || isStarting}
+        disabled={!available || isStarting || gridConfigLoading}
         className={`
           w-full py-4 rounded-[6px] font-bold text-lg transition-all duration-200
           ${available && !isStarting
@@ -188,8 +193,10 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
           </span>
         ) : !available ? (
           "Grid Unavailable"
+        ) : gridConfigLoading || !gridInfo?.[selectedGrid as 0|1|2] ? (
+          "Loading…"
         ) : (
-          `Play — ${GRID_INFO[selectedGrid as 0|1|2].entryLabel}`
+          `Play — ${gridInfo[selectedGrid as 0|1|2].entryLabel}`
         )}
       </button>
 

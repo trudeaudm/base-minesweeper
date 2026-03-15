@@ -16,10 +16,10 @@ import {
   RPC_URL,
   SESSION_GAS_BUDGET,
   GameStatus,
-  GRID_INFO,
   calcMultiplier,
   CANCEL_BLOCKS_WAITING_FIRST_FLIP,
 } from "@/lib/config";
+import { useGridConfigs } from "@/hooks/useGridConfigs";
 import {
   getOrCreateSessionKey,
   getSessionKey,
@@ -206,7 +206,8 @@ export function useGame() {
 
   const [burstRevealOrder, setBurstRevealOrder] = useState<number[]>([]);
 
-  const FLIP_BATCH_DELAY_MS = 300;
+  const { gridInfo } = useGridConfigs();
+  const FLIP_BATCH_DELAY_MS = 1000;
 
   // ── Current block number (for block-based cancel countdown) ───────────────
   // Poll block number instead of watch (avoids "filter not found" on Alchemy/HTTP RPCs)
@@ -269,7 +270,7 @@ export function useGame() {
 
   // ── Sync rawGame → gameState ─────────────────────────────────────────────
   useEffect(() => {
-    if (!rawGame || !currentGameId) return;
+    if (!rawGame || !currentGameId || !gridInfo) return;
 
     const [
       , sessionKey, gridSize, difficulty, entryFee,
@@ -278,7 +279,7 @@ export function useGame() {
     ] = rawGame;
 
     const status     = statusNum as GameStatus;
-    const totalTiles = GRID_INFO[gridSize as 0|1|2].totalTiles;
+    const totalTiles = gridInfo?.[gridSize as 0|1|2]?.totalTiles ?? 0;
     const mult       = calcMultiplier(safeRevealed, totalSafe, difficulty);
     const payout     = safeRevealed === 0
       ? 0n
@@ -331,7 +332,7 @@ export function useGame() {
       isCashedOut:        status === GameStatus.CASHED_OUT,
       isGameOver:         status === GameStatus.GAME_OVER,
     });
-  }, [rawGame, currentGameId, pendingTile, pendingTiles]);
+  }, [rawGame, currentGameId, pendingTile, pendingTiles, gridInfo]);
 
   // ── Wallet write hook (used only for startGame) ──────────────────────────
   const { writeContractAsync } = useWriteContract();
@@ -353,8 +354,9 @@ export function useGame() {
       sessionAcc.current = getOrCreateSessionKey();
       const sk = sessionAcc.current.address;
 
-      const entryFee = GRID_INFO[gridSize as 0|1|2].entryFee;
-      const value = entryFee + SESSION_GAS_BUDGET;
+      const cfg = gridInfo?.[gridSize as 0|1|2];
+      if (!cfg) throw new Error("Grid config not loaded");
+      const value = cfg.entryFee + SESSION_GAS_BUDGET;
 
       // Single wallet popup: pays entry fee + gas budget, registers session key; contract forwards gas to session key
       const hash = await writeContractAsync({
@@ -362,7 +364,7 @@ export function useGame() {
         abi:          MINESWEEPER_ABI,
         functionName: "startGame",
         args:         [gridSize, difficulty, sk],
-        value,
+        value,  // cfg.entryFee + SESSION_GAS_BUDGET (must match contract)
       });
 
       if (publicClient) {
@@ -396,7 +398,7 @@ export function useGame() {
     } finally {
       setIsStarting(false);
     }
-  }, [playerAddress, writeContractAsync, publicClient, refetchGame, refetchActiveGame]);
+  }, [playerAddress, writeContractAsync, publicClient, refetchGame, refetchActiveGame, gridInfo]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Flip Tile(s)  (signed by session key – zero wallet popups)

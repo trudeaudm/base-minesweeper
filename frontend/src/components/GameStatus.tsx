@@ -1,4 +1,5 @@
-import { formatEth, GameStatus, GRID_INFO, DIFF_INFO } from "@/lib/config";
+import { formatEth, GameStatus, DIFF_INFO } from "@/lib/config";
+import { useGridConfigs } from "@/hooks/useGridConfigs";
 
 interface GameStatusProps {
   gridSize:           number;
@@ -44,11 +45,13 @@ export function GameStatusBar({
   onCancelGame,
   isCancelling,
 }: GameStatusProps) {
-  const info       = GRID_INFO[gridSize as 0 | 1 | 2];
+  const { gridInfo } = useGridConfigs();
+  const info       = gridInfo?.[gridSize as 0 | 1 | 2];
   const diffInfo   = DIFF_INFO[difficulty as 0 | 1 | 2];
   const isActive   = status === GameStatus.ACTIVE;
   const canCashout = isActive && safeRevealed > 0;
   const showCancelUI = isWaitingFirstFlip && cancelBlockDataReady;
+  const gridLabel = info?.label ?? "…";
 
   const progressPct = totalSafe > 0 ? (safeRevealed / totalSafe) * 100 : 0;
   const multiplierColor =
@@ -63,7 +66,7 @@ export function GameStatusBar({
       {/* Grid info row */}
       <div className="flex items-center justify-between text-xs text-gray-600">
         <span className="font-mono">
-          {info.label} &nbsp;·&nbsp;
+          {gridLabel} &nbsp;·&nbsp;
           <span className={diffInfo.color}>{diffInfo.label}</span>
         </span>
         <span className="font-mono">

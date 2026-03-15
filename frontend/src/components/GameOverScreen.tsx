@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
-import { GRID_INFO, DIFF_INFO } from "@/lib/config";
+import { DIFF_INFO } from "@/lib/config";
+import { useGridConfigs } from "@/hooks/useGridConfigs";
 
 interface GameOverProps {
   entryFee:   bigint;
@@ -64,8 +65,10 @@ export function GameOverScreen({ gridSize, difficulty }: GameOverProps) {
 
   if (animationComplete) return null;
 
-  const info     = GRID_INFO[gridSize as 0 | 1 | 2];
+  const { gridInfo } = useGridConfigs();
+  const info     = gridInfo?.[gridSize as 0 | 1 | 2];
   const diffInfo = DIFF_INFO[difficulty as 0 | 1 | 2];
+  const gridLabel = info?.label ?? "…";
 
   // Overlay only: transparent background, RUGGED text and letter explosion. Board remains visible; no Try Again (use New Game below grid).
   return (
@@ -100,9 +103,9 @@ export function GameOverScreen({ gridSize, difficulty }: GameOverProps) {
         </h1>
       </div>
       {/* Optional small label so overlay context is clear; still no background */}
-      <p className="mt-4 text-white/80 text-sm drop-shadow-md">
-        {info.label} · <span className={diffInfo.color}>{diffInfo.label}</span>
-      </p>
+      /*<p className="mt-4 text-white/80 text-sm drop-shadow-md">
+        {gridLabel} · <span className={diffInfo.color}>{diffInfo.label}</span>
+      </p>*/
     </div>
   );
 }
