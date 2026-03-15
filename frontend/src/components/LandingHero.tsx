@@ -40,7 +40,7 @@ export function LandingHero() {
           { image: "/hero/Base-Stack.png", text: "Up to 1.9× your entry fee (by difficulty)" },
         ].map(({ image, text }) => (
           <div key={text} className="flex items-center gap-3 text-left px-4 py-3 bg-gray-50 rounded-[4px]">
-            <img src={image} alt="" className="w-6 h-6 shrink-0 object-contain" />
+            <img src={image} alt="" className="w-[31px] h-[31px] shrink-0 object-contain" />
             <span className="text-gray-700 text-sm">{text}</span>
           </div>
         ))}
