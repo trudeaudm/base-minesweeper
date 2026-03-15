@@ -1,9 +1,8 @@
-import { useEffect, useState, useRef } from "react";
+import { memo, useEffect, useState, useRef } from "react";
 import { DIFF_INFO } from "@/lib/config";
 import { useGridConfigs } from "@/hooks/useGridConfigs";
 
 interface GameOverProps {
-  entryFee:   bigint;
   gridSize:   number;
   difficulty: number;
   onPlayAgain: () => void;
@@ -19,7 +18,7 @@ function getLetterExplodeDelay(index: number): number {
   return base + index * perLetter + (jitter % 90);
 }
 
-export function GameOverScreen({ gridSize, difficulty, onPlayAgain }: GameOverProps) {
+function GameOverScreenComponent({ gridSize, difficulty, onPlayAgain }: GameOverProps) {
   const [show, setShow] = useState(false);
   const [explodingLetters, setExplodingLetters] = useState<Set<number>>(new Set());
   const [explodedLetters, setExplodedLetters] = useState<Set<number>>(new Set());
@@ -126,3 +125,5 @@ export function GameOverScreen({ gridSize, difficulty, onPlayAgain }: GameOverPr
     </div>
   );
 }
+
+export const GameOverScreen = memo(GameOverScreenComponent);

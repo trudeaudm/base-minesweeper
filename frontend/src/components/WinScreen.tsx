@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { BaseLogo } from "./BaseLogo";
 import { formatEth, DIFF_INFO } from "@/lib/config";
 import { useGridConfigs } from "@/hooks/useGridConfigs";
@@ -93,7 +93,7 @@ interface WinScreenProps {
   onPlayAgain: () => void;
 }
 
-export function WinScreen({ payout, entryFee, gridSize, difficulty, onPlayAgain }: WinScreenProps) {
+function WinScreenComponent({ payout, entryFee, gridSize, difficulty, onPlayAgain }: WinScreenProps) {
   const [show,         setShow]         = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
 
@@ -169,3 +169,5 @@ export function WinScreen({ payout, entryFee, gridSize, difficulty, onPlayAgain 
     </>
   );
 }
+
+export const WinScreen = memo(WinScreenComponent);

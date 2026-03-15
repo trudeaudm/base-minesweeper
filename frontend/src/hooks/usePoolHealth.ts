@@ -21,25 +21,6 @@ export function usePoolHealth() {
   };
 }
 
-export function useGridAvailability() {
-  const grids  = [GRID_SMALL, GRID_MEDIUM, GRID_LARGE];
-  const diffs  = [DIFF_EASY, DIFF_NORMAL, DIFF_HARD];
-
-  // Batch availability checks
-  const results: Record<number, Record<number, boolean>> = {};
-
-  for (const g of grids) {
-    results[g] = {};
-    for (const d of diffs) {
-      // We use individual hooks via useReadContract
-      // In a real app you'd use multicall; this is simplified
-      results[g][d] = true; // placeholder — see useGridAvailabilityForCell
-    }
-  }
-
-  return results;
-}
-
 export function useGridAvailable(gridSize: number, difficulty: number) {
   const { data } = useReadContract({
     address: CONTRACT_ADDRESS,

@@ -465,13 +465,14 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         Game storage g = games[gameId];
         require(g.status == GameStatus.ACTIVE, "Game not active");
         uint8 totalTiles = gridConfigs[g.gridSize].totalTiles;
+        uint64 bitmask = _mineBitmask[gameId];
 
         for (uint256 i = 0; i < tileIndices.length; i++) {
             uint8 tileIndex = tileIndices[i];
             if (tileIndex >= totalTiles) continue;
             if ((g.revealedBitmask >> tileIndex) & 1 == 1) continue;
 
-            bool isMine = (_mineBitmask[gameId] >> tileIndex) & 1 == 1;
+            bool isMine = (bitmask >> tileIndex) & 1 == 1;
 
             if (isMine) {
                 _endGame(gameId, tileIndex, GameStatus.GAME_OVER);
@@ -480,7 +481,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
 
             g.revealedBitmask |= uint64(1) << tileIndex;
             g.safeRevealed++;
-            _revealedAdjacency[gameId][tileIndex] = _countAdjacentMines(gameId, tileIndex, totalTiles);
+            _revealedAdjacency[gameId][tileIndex] = _countAdjacentMinesWithBitmask(bitmask, tileIndex, totalTiles);
 
             uint256 currentPayout = _calculatePayout(g);
 
@@ -575,7 +576,15 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         uint8   tileIndex,
         uint8   totalTiles
     ) internal view returns (uint8) {
-        uint64 bitmask = _mineBitmask[gameId];
+        return _countAdjacentMinesWithBitmask(_mineBitmask[gameId], tileIndex, totalTiles);
+    }
+
+    /** @dev Same as _countAdjacentMines but takes bitmask in memory (avoids storage read per call in flipTiles loop). */
+    function _countAdjacentMinesWithBitmask(
+        uint64 bitmask,
+        uint8  tileIndex,
+        uint8  totalTiles
+    ) internal pure returns (uint8) {
         uint8 cols = 5;
         uint8 row = tileIndex / cols;
         uint8 col = tileIndex % cols;

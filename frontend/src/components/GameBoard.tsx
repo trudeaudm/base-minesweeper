@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import { useEffect, useState, useRef } from "react";
+import { memo, useEffect, useState, useRef } from "react";
 import { Tile } from "./Tile";
 import { type TileState } from "@/hooks/useGame";
 import { GameStatus } from "@/lib/config";
@@ -64,7 +64,7 @@ const TILE_SHAKE_COUNT = 3;
 
 export type ExplosionPhase = "pending" | "exploding" | "exploded";
 
-export function GameBoard({
+function GameBoardComponent({
   gridSize,
   tileStates,
   mineBitmask,
@@ -256,3 +256,5 @@ export function GameBoard({
     </div>
   );
 }
+
+export const GameBoard = memo(GameBoardComponent);

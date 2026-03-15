@@ -25,7 +25,6 @@ export default {
       animation: {
         "pulse-slow":      "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         "mine-reveal":     "mineReveal 0.55s ease-out forwards",
-        "win-flash":       "winFlash 0.6s ease-out forwards",
         "tile-flip":       "tileFlip 0.32s ease-out forwards",
         "bounce-in":       "bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards",
         "vrf-wave":        "vrfWave 1.8s ease-in-out infinite",
@@ -70,11 +69,6 @@ export default {
           "74%":  { transform: "rotateY(0deg)  scale(1.08) translateX(-3px)", backgroundColor: "#FF4444" },
           "86%":  { transform: "rotateY(0deg)  scale(1.08) translateX(3px)",  backgroundColor: "#FF4444" },
           "100%": { transform: "rotateY(0deg)  scale(1)    translateX(0px)",  backgroundColor: "#FF4444" },
-        },
-        winFlash: {
-          "0%":   { opacity: "0", backgroundColor: "#0052FF" },
-          "50%":  { opacity: "1", backgroundColor: "#00C851" },
-          "100%": { opacity: "1", backgroundColor: "#0052FF" },
         },
         bounceIn: {
           "0%":   { transform: "scale(0.3)",  opacity: "0" },

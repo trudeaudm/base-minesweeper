@@ -45,11 +45,6 @@ html, body, #root {
 ::-webkit-scrollbar-track  { background: transparent; }
 ::-webkit-scrollbar-thumb  { background: rgba(0,0,0,0.2); border-radius: 1px; }
 
-/* Perspective for tile flip animation */
-.tile-wrapper {
-  perspective: 600px;
-}
-
 /* BUG 3: Pending tile shake/grow — high specificity so no other rule overrides transform */
 @keyframes tilePendingForced {
   0%, 100% { transform: scale(1) translate(0, 0); }

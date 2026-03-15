@@ -177,7 +177,9 @@ async function sweepSessionKeyToPlayer(
     });
     await publicClient.waitForTransactionReceipt({ hash });
   } catch (e) {
-    console.warn("[sweep] session key balance return failed:", e);
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[sweep] session key balance return failed:", e);
+    }
   } finally {
     clearSessionKey();
   }
@@ -573,7 +575,7 @@ export function useGame() {
     batchTimerRef.current = setTimeout(() => {
       flushBatch();
     }, FLIP_BATCH_DELAY_MS);
-  }, [gameState, writeContractAsync, publicClient, playerAddress, refetchGame, flushBatch, FLIP_BATCH_DELAY_MS]);
+  }, [gameState, flushBatch]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Cash Out  (signed by session key – zero wallet popups)

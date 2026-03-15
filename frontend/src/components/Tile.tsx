@@ -1,4 +1,5 @@
 import type { RefObject } from "react";
+import { memo } from "react";
 import { type TileState } from "@/hooks/useGame";
 import { BaseMineIcon } from "./BaseLogo";
 import type { ExplosionPhase, TileFlyDirection } from "./GameBoard";
@@ -36,7 +37,7 @@ const NUMBER_COLORS = [
   "text-gray-500",    // 8
 ];
 
-export function Tile({
+function TileComponent({
   index,
   cols,
   state,
@@ -77,9 +78,7 @@ export function Tile({
       const el = e.currentTarget;
       // Apply pending animation class in the same tick so shake/grow is visible before any re-render.
       el.classList.add("tile-pending-anim");
-      // Optional: mark for tests or DOM inspection that this tile is in pending state.
       el.setAttribute("data-tile-pending", "true");
-      if (process.env.NODE_ENV === "development") console.log("[tile] pending class applied", index);
       // Notify parent: GameBoard passes onFlip, which is useGame.flipTile(index). Triggers batch or firstFlip.
       onClick(index);
     }
@@ -275,3 +274,5 @@ export function Tile({
     />
   );
 }
+
+export const Tile = memo(TileComponent);

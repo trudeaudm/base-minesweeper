@@ -249,7 +249,6 @@ function GameApp() {
       {/* Game over (RUGGED) overlay */}
       {gameState.isGameOver && !gameState.isCashedOut && (
         <GameOverScreen
-          entryFee={gameState.entryFee}
           gridSize={gameState.gridSize}
           difficulty={gameState.difficulty}
           onPlayAgain={resetGame}
