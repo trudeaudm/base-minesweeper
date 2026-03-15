@@ -39,6 +39,7 @@ export interface GameBoardProps {
   gridSize:               number;
   tileStates:             TileState[];
   mineBitmask:            bigint;
+  revealedAdjacency:      number[]; // per-tile adjacent mine count (0-8) from contract
   status:                 GameStatus;
   onFlip:                 (index: number) => void;
   isCashout?:             boolean;
@@ -58,30 +59,6 @@ function getFlyDirection(index: number): TileFlyDirection {
   return dirs[seed % 4];
 }
 
-/** Count mines in the 8 neighbours of tile at `index` in a grid of width `cols`. */
-function adjacentMineCount(
-  index:       number,
-  cols:        number,
-  totalTiles:  number,
-  mineBitmask: bigint
-): number {
-  const row = Math.floor(index / cols);
-  const col = index % cols;
-  let count = 0;
-  for (let dr = -1; dr <= 1; dr++) {
-    for (let dc = -1; dc <= 1; dc++) {
-      if (dr === 0 && dc === 0) continue;
-      const nr = row + dr;
-      const nc = col + dc;
-      if (nr < 0 || nc < 0 || nc >= cols) continue;
-      const ni = nr * cols + nc;
-      if (ni >= totalTiles) continue;
-      if (((mineBitmask >> BigInt(ni)) & 1n) === 1n) count++;
-    }
-  }
-  return count;
-}
-
 const TILE_SHAKE_INTERVAL_MS = 2600;
 const TILE_SHAKE_COUNT = 3;
 
@@ -91,6 +68,7 @@ export function GameBoard({
   gridSize,
   tileStates,
   mineBitmask,
+  revealedAdjacency,
   status,
   onFlip,
   isCashout = false,
@@ -255,8 +233,8 @@ export function GameBoard({
               state={state}
               pendingIndicesRef={pendingTilesRef}
               adjacentCount={
-                state === "safe"
-                  ? adjacentMineCount(i, info.cols, info.totalTiles, mineBitmask)
+                state === "safe" && revealedAdjacency[i] !== undefined
+                  ? revealedAdjacency[i]
                   : undefined
               }
               onClick={onFlip}

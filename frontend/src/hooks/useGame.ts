@@ -83,6 +83,7 @@ export interface GameState {
   safeRevealed:        number;
   totalSafe:           number;
   tileStates:          TileState[];
+  revealedAdjacency:   number[]; // per-tile adjacent mine count (0-8) from contract; only set for revealed safe tiles
   multiplier:          number;
   currentPayout:       bigint;
   sessionKeyAddr:      `0x${string}` | null;
@@ -107,6 +108,7 @@ const EMPTY_STATE: GameState = {
   safeRevealed:       0,
   totalSafe:          0,
   tileStates:         [],
+  revealedAdjacency:  [],
   multiplier:         0,
   currentPayout:      0n,
   sessionKeyAddr:     null,
@@ -277,8 +279,12 @@ export function useGame() {
       , sessionKey, gridSize, difficulty, entryFee,
       maxPayout, revealedMineBitmask, revealedBitmask,
       safeRevealed, totalSafe, statusNum, startBlock, startedAt,
+      revealedAdjacencyRaw,
     ] = rawGame;
     const mineBitmask = revealedMineBitmask;
+    const revealedAdjacency = Array.isArray(revealedAdjacencyRaw)
+      ? revealedAdjacencyRaw.map((n: unknown) => Number(n))
+      : [];
 
     const status     = statusNum as GameStatus;
     const totalTiles = gridInfo?.[gridSize as 0|1|2]?.totalTiles ?? 0;
@@ -318,6 +324,7 @@ export function useGame() {
       safeRevealed,
       totalSafe,
       tileStates:     tiles,
+      revealedAdjacency,
       multiplier:     mult,
       currentPayout:  payout,
       sessionKeyAddr: sessionKey !== "0x0000000000000000000000000000000000000000"

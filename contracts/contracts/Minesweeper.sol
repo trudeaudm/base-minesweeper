@@ -116,6 +116,9 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     // gameId → full mine layout (private; not exposed until game ends)
     mapping(uint256 => uint64) private _mineBitmask;
 
+    // gameId => tileIndex => adjacent mine count (0-8); only set when a safe tile is revealed
+    mapping(uint256 => mapping(uint8 => uint8)) private _revealedAdjacency;
+
     // vrfRequestId → gameId
     mapping(uint256 => uint256) public vrfRequestToGame;
 
@@ -394,10 +397,11 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         // Place mines using stored VRF randomness; first tile is guaranteed safe
         _mineBitmask[gameId] = _generateMines(g.vrfRandomness, totalTiles, mineCount, tileIndex);
 
-        // Reveal the first (guaranteed safe) tile and transition to ACTIVE
+        // Reveal the first (guaranteed safe) tile and transition to ACTIVE; store adjacency
         g.revealedBitmask = uint64(1) << tileIndex;
         g.safeRevealed    = 1;
         g.status          = GameStatus.ACTIVE;
+        _revealedAdjacency[gameId][tileIndex] = _countAdjacentMines(gameId, tileIndex, totalTiles);
 
         uint256 currentPayout = _calculatePayout(g);
         emit TileRevealed(gameId, msg.sender, tileIndex, false, 1, currentPayout);
@@ -427,6 +431,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         } else {
             g.revealedBitmask |= uint64(1) << tileIndex;
             g.safeRevealed++;
+            _revealedAdjacency[gameId][tileIndex] = _countAdjacentMines(gameId, tileIndex, gridConfigs[g.gridSize].totalTiles);
 
             uint256 currentPayout = _calculatePayout(g);
 
@@ -475,6 +480,7 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
 
             g.revealedBitmask |= uint64(1) << tileIndex;
             g.safeRevealed++;
+            _revealedAdjacency[gameId][tileIndex] = _countAdjacentMines(gameId, tileIndex, totalTiles);
 
             uint256 currentPayout = _calculatePayout(g);
 
@@ -561,6 +567,31 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
     function _calculatePayout(Game storage g) internal view returns (uint256) {
         if (g.safeRevealed == 0) return 0;
         return (g.maxPayout * g.safeRevealed) / g.totalSafe;
+    }
+
+    /** @dev Grid is 5 columns; count mines in the 8 neighbours using full _mineBitmask. */
+    function _countAdjacentMines(
+        uint256 gameId,
+        uint8   tileIndex,
+        uint8   totalTiles
+    ) internal view returns (uint8) {
+        uint64 bitmask = _mineBitmask[gameId];
+        uint8 cols = 5;
+        uint8 row = tileIndex / cols;
+        uint8 col = tileIndex % cols;
+        uint8 count = 0;
+        for (int256 dr = -1; dr <= 1; dr++) {
+            for (int256 dc = -1; dc <= 1; dc++) {
+                if (dr == 0 && dc == 0) continue;
+                int256 nr = int256(uint256(row)) + dr;
+                int256 nc = int256(uint256(col)) + dc;
+                if (nr < 0 || nc < 0 || nc >= 5) continue;
+                uint256 ni = uint256(nr) * 5 + uint256(nc);
+                if (ni >= totalTiles) continue;
+                if ((bitmask >> ni) & 1 == 1) count++;
+            }
+        }
+        return count;
     }
 
     // ─────────────────────────────────────────────
@@ -659,28 +690,36 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
         external
         view
         returns (
-            address  player,
-            address  sessionKey,
-            uint8    gridSize,
-            uint8    difficulty,
-            uint256  entryFee,
-            uint256  maxPayout,
-            uint64   mineBitmask,
-            uint64   revealedBitmask,
-            uint8    safeRevealed,
-            uint8    totalSafe,
+            address   player,
+            address   sessionKey,
+            uint8     gridSize,
+            uint8     difficulty,
+            uint256   entryFee,
+            uint256   maxPayout,
+            uint64    mineBitmask,
+            uint64    revealedBitmask,
+            uint8     safeRevealed,
+            uint8     totalSafe,
             GameStatus status,
-            uint256  startBlock,
-            uint256  startedAt,
-            uint256  endedAt
+            uint256   startBlock,
+            uint256   startedAt,
+            uint256   endedAt,
+            uint8[]   memory revealedAdjacency
         )
     {
         Game storage g = games[gameId];
+        uint8 totalTiles = gridConfigs[g.gridSize].totalTiles;
         // During active play expose only revealed mines; at game end expose full layout
         uint64 exposedBitmask =
             (g.status == GameStatus.GAME_OVER || g.status == GameStatus.CASHED_OUT)
                 ? _mineBitmask[gameId]
                 : g.revealedMineBitmask;
+
+        revealedAdjacency = new uint8[](totalTiles);
+        for (uint256 i = 0; i < totalTiles; i++) {
+            revealedAdjacency[i] = _revealedAdjacency[gameId][uint8(i)];
+        }
+
         return (
             g.player,
             g.sessionKey,
@@ -695,7 +734,8 @@ contract Minesweeper is VRFConsumerBaseV2Plus, ReentrancyGuard {
             g.status,
             g.startBlock,
             g.startedAt,
-            g.endedAt
+            g.endedAt,
+            revealedAdjacency
         );
     }
 

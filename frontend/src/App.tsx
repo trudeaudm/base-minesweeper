@@ -193,6 +193,7 @@ function GameApp() {
                   gridSize={gameState.gridSize}
                   tileStates={gameState.tileStates}
                   mineBitmask={gameState.mineBitmask}
+                  revealedAdjacency={gameState.revealedAdjacency}
                   status={gameState.status}
                   onFlip={flipTile}
                   isCashout={gameState.safeRevealed > 0 && gameState.isActive}
