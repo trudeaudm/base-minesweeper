@@ -522,11 +522,12 @@ export function useGame() {
     }
 
     // ACTIVE: add to batch and start/reset delay timer. Update ref synchronously so isFlipPending stays false during 50ms.
+    // Apply pending state immediately (same tick) so the tile shows shake/scale animation on click — flushSync forces a sync re-render while ref is already set.
     const next = pendingTilesRef.current.includes(tileIndex)
       ? pendingTilesRef.current
       : [...pendingTilesRef.current, tileIndex];
     pendingTilesRef.current = next;
-    setPendingTiles(next);
+    flushSync(() => setPendingTiles(next));
     if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
     batchTimerRef.current = setTimeout(() => {
       flushBatch();
@@ -677,10 +678,8 @@ export function useGame() {
     setBurstRevealOrder([]);
   }, []);
 
-  // Grey only when a flip tx is in flight; never grey during 50ms batch collection. Use ref so greying stays false until timer expires.
-  const isFlipPending =
-    (pendingTile !== null || isFlipInFlight) &&
-    !(gameState.isActive && pendingTilesRef.current.length > 0);
+  // Grey/disable only when a flip tx is actually in flight (inside flushBatch). Never grey during the 50ms debounce window.
+  const isFlipPending = isFlipInFlight;
 
   // From the moment the first tile is clicked until VRF returns: disable all tiles, grey out, show fly animation
   const waitingForVrfResponse =
@@ -693,6 +692,7 @@ export function useGame() {
     isCancelling,
     pendingTile,
     pendingTiles,
+    pendingTilesRef,
     isFlipPending,
     isFlipInFlight,
     waitingForVrfResponse,

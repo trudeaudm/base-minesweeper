@@ -1,3 +1,4 @@
+import type { RefObject } from "react";
 import { useEffect, useState, useRef } from "react";
 import { Tile } from "./Tile";
 import { type TileState } from "@/hooks/useGame";
@@ -40,12 +41,14 @@ export interface GameBoardProps {
   status:                 GameStatus;
   onFlip:                 (index: number) => void;
   isCashout?:             boolean;
+  pendingTilesRef?:       RefObject<number[]>;
   isFlipPending?:         boolean;  // true when flip tx in flight (after 50ms debounce)
   waitingForVrfResponse?: boolean;  // first click made, VRF in-flight: disable all, grey, fly animation
   burstRevealOrder?:      number[];  // tile indices in click order for burst reveal
   onBurstRevealComplete?: () => void;
   mineHitTileIndex?:      number | null;
   onExplosionComplete?:   () => void;
+  explosionComplete?:     boolean;  // true when mine-reveal sequence has finished (used to re-enable pointer events)
 }
 
 /** Deterministic per-tile fly direction (randomized per index). */
@@ -91,12 +94,14 @@ export function GameBoard({
   status,
   onFlip,
   isCashout = false,
+  pendingTilesRef,
   isFlipPending = false,
   waitingForVrfResponse = false,
   burstRevealOrder = [],
   onBurstRevealComplete,
   mineHitTileIndex = null,
   onExplosionComplete,
+  explosionComplete = true,
 }: GameBoardProps) {
   const info = GRID_INFO[gridSize as 0 | 1 | 2];
 
@@ -224,9 +229,12 @@ export function GameBoard({
     return () => clearInterval(id);
   }, [active, isWaitingVRF, isGameOver]);
 
+  // Suppress all board clicks when game over until mine reveal sequence completes (BUG 4: prevent clicks from cancelling reveal)
+  const suppressClicks = isGameOver && mineHitTileIndex != null && !explosionComplete;
+
   return (
     <div
-      className={`w-full max-w-xs mx-auto relative ${screenShake ? "animate-screen-shake" : ""}`}
+      className={`w-full max-w-xs mx-auto relative ${screenShake ? "animate-screen-shake" : ""} ${suppressClicks ? "pointer-events-none" : ""}`}
       role="grid"
       aria-label="Minesweeper board"
     >
@@ -247,6 +255,7 @@ export function GameBoard({
               index={i}
               cols={info.cols}
               state={state}
+              pendingIndicesRef={pendingTilesRef}
               adjacentCount={
                 state === "safe"
                   ? adjacentMineCount(i, info.cols, info.totalTiles, mineBitmask)

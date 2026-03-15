@@ -1,10 +1,20 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { BaseLogo } from "./BaseLogo";
-import { usePoolHealth } from "@/hooks/usePoolHealth";
-import { formatEth, GRID_INFO, GRID_SMALL, GRID_MEDIUM, GRID_LARGE } from "@/lib/config";
+import { usePoolHealth, useGridAvailable, useMinPoolThresholds } from "@/hooks/usePoolHealth";
+import { formatEth, GRID_INFO, GRID_SMALL, GRID_MEDIUM, GRID_LARGE, DIFF_NORMAL } from "@/lib/config";
 
 export function LandingHero() {
   const { pool, isLoading } = usePoolHealth();
+  const availableSmall  = useGridAvailable(GRID_SMALL, DIFF_NORMAL);
+  const availableMedium = useGridAvailable(GRID_MEDIUM, DIFF_NORMAL);
+  const availableLarge  = useGridAvailable(GRID_LARGE, DIFF_NORMAL);
+  const minPoolThresholds = useMinPoolThresholds();
+
+  const availability = {
+    [GRID_SMALL]:  availableSmall,
+    [GRID_MEDIUM]: availableMedium,
+    [GRID_LARGE]:  availableLarge,
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center">
@@ -34,22 +44,30 @@ export function LandingHero() {
         ))}
       </div>
 
-      {/* Pool status per grid */}
+      {/* Pool status per grid — same source of truth as New Game (contract isGridAvailable), works without wallet via chainId */}
       <div className="w-full max-w-xs mb-8">
         <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">Pool Balance</div>
         <div className="space-y-1.5">
-          {[GRID_SMALL, GRID_MEDIUM, GRID_LARGE].map(g => {
-            const info   = GRID_INFO[g as 0|1|2];
-            const hasFunds = pool >= info.entryFee * 2n;
+          {([GRID_SMALL, GRID_MEDIUM, GRID_LARGE] as const).map(g => {
+            const info       = GRID_INFO[g];
+            const hasFunds   = availability[g];
+            const requiredEth = formatEth(minPoolThresholds[g] ?? 0n, 4);
             return (
-              <div key={g} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-[4px]">
-                <span className="text-gray-700 text-sm">{info.label} ({info.entryLabel})</span>
-                <div className="flex items-center gap-1.5">
-                  <div className={`w-1.5 h-1.5 rounded-full ${hasFunds ? "bg-accent-green" : "bg-mine"}`} />
-                  <span className={`text-xs font-mono ${hasFunds ? "text-accent-green" : "text-mine"}`}>
-                    {isLoading ? "…" : hasFunds ? "Available" : "Unavailable"}
-                  </span>
+              <div key={g} className="flex flex-col gap-1 px-3 py-2 bg-gray-50 rounded-[4px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-700 text-sm">{info.label} ({info.entryLabel})</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className={`w-1.5 h-1.5 rounded-full ${hasFunds ? "bg-accent-green" : "bg-mine"}`} />
+                    <span className={`text-xs font-mono ${hasFunds ? "text-accent-green" : "text-mine"}`}>
+                      {isLoading ? "…" : hasFunds ? "Available" : "Pool insufficient"}
+                    </span>
+                  </div>
                 </div>
+                {!hasFunds && !isLoading && (
+                  <p className="text-xs text-amber-600">
+                    needs {requiredEth} ETH in pool
+                  </p>
+                )}
               </div>
             );
           })}

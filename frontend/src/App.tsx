@@ -25,12 +25,14 @@ function GameApp() {
     canCancel,
     cancelThresholdBlocks,
     pendingTile,
+    pendingTilesRef,
     isFlipPending,
     waitingForVrfResponse,
     burstRevealOrder,
     onBurstRevealComplete,
     mineHitTileIndex,
     onExplosionComplete,
+    explosionComplete,
     startGame,
     flipTile,
     cashOut,
@@ -125,12 +127,14 @@ function GameApp() {
               status={gameState.status}
               onFlip={flipTile}
               isCashout={gameState.safeRevealed > 0 && gameState.isActive}
+              pendingTilesRef={pendingTilesRef}
               isFlipPending={isFlipPending}
               waitingForVrfResponse={waitingForVrfResponse}
               burstRevealOrder={burstRevealOrder}
               onBurstRevealComplete={onBurstRevealComplete}
               mineHitTileIndex={mineHitTileIndex}
               onExplosionComplete={onExplosionComplete}
+              explosionComplete={explosionComplete}
             />
 
             {/* Session key indicator — hide when game over */}

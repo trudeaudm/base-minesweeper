@@ -1,24 +1,26 @@
+import type { RefObject } from "react";
 import { type TileState } from "@/hooks/useGame";
 import { BaseMineIcon } from "./BaseLogo";
 import type { ExplosionPhase, TileFlyDirection } from "./GameBoard";
 
 interface TileProps {
-  index:             number;
-  cols:              number;
-  state:             TileState;
-  adjacentCount?:   number;
-  onClick:           (index: number) => void;
-  disabled:          boolean;
-  isCashout?:       boolean;  // pulse hint: player can cash out
-  isWaitingVRF?:    boolean;  // VRF wait: grey + fly animation (use with flyDirection)
-  flyDirection?:    TileFlyDirection;  // when isWaitingVRF: direction for fly-off-and-back
-  isHighlighted?:   boolean;  // blue glow when VRF bounce logo lands on this tile
-  isGameOver?:      boolean;  // fade unrevealed tiles to dark on loss
-  isWinReveal?:     boolean;  // flip unrevealed tiles to white on win
-  explosionPhase?:  ExplosionPhase;  // mine explosion sequence: pending | exploding | exploded
-  isShaking?:       boolean;  // subtle shake (random tiles during play)
-  burstOrderIndex?: number | null;  // index in burst reveal order (0-based), null if not in burst
-  currentBurstIndex?: number;  // current step in burst sequence
+  index:               number;
+  cols:                number;
+  state:               TileState;
+  pendingIndicesRef?:  RefObject<number[] | undefined>;  // ref updated at click so pending shows immediately (BUG 1)
+  adjacentCount?:      number;
+  onClick:             (index: number) => void;
+  disabled:            boolean;
+  isCashout?:          boolean;  // pulse hint: player can cash out
+  isWaitingVRF?:       boolean;  // VRF wait: grey + fly animation (use with flyDirection)
+  flyDirection?:       TileFlyDirection;  // when isWaitingVRF: direction for fly-off-and-back
+  isHighlighted?:      boolean;  // blue glow when VRF bounce logo lands on this tile
+  isGameOver?:         boolean;  // fade unrevealed tiles to dark on loss
+  isWinReveal?:        boolean;  // flip unrevealed tiles to white on win
+  explosionPhase?:     ExplosionPhase;  // mine explosion sequence: pending | exploding | exploded
+  isShaking?:          boolean;  // subtle shake (random tiles during play)
+  burstOrderIndex?:    number | null;  // index in burst reveal order (0-based), null if not in burst
+  currentBurstIndex?:  number;  // current step in burst sequence
 }
 
 // Classic minesweeper number colors — tuned for light (white) tile background
@@ -38,6 +40,7 @@ export function Tile({
   index,
   cols,
   state,
+  pendingIndicesRef,
   adjacentCount,
   onClick,
   disabled,
@@ -53,7 +56,8 @@ export function Tile({
   currentBurstIndex = 0,
 }: TileProps) {
   const inBurstList = burstOrderIndex !== null && burstOrderIndex !== undefined;
-  const showAsPending = state === "pending" || (inBurstList && currentBurstIndex < burstOrderIndex);
+  const inPendingRef = pendingIndicesRef?.current?.includes(index);
+  const showAsPending = state === "pending" || (inBurstList && currentBurstIndex < burstOrderIndex) || (inPendingRef && state === "unrevealed");
   const showBurstReveal = inBurstList && currentBurstIndex === burstOrderIndex;
   const showRevealedAfterBurst = inBurstList && currentBurstIndex > burstOrderIndex;
   const flyClass =

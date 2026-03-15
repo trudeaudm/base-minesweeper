@@ -22,6 +22,7 @@ export function GameOverScreen({ gridSize, difficulty }: GameOverProps) {
   const [show, setShow] = useState(false);
   const [explodingLetters, setExplodingLetters] = useState<Set<number>>(new Set());
   const [explodedLetters, setExplodedLetters] = useState<Set<number>>(new Set());
+  const [animationComplete, setAnimationComplete] = useState(false);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
@@ -32,6 +33,8 @@ export function GameOverScreen({ gridSize, difficulty }: GameOverProps) {
   // After overlay is visible, trigger each letter to explode with random stagger
   useEffect(() => {
     if (!show) return;
+    const lastIndex = RUGGED_LETTERS.length - 1;
+    const lastDelay = getLetterExplodeDelay(lastIndex);
     RUGGED_LETTERS.forEach((_, i) => {
       const delay = getLetterExplodeDelay(i);
       const startId = setTimeout(() => {
@@ -48,11 +51,18 @@ export function GameOverScreen({ gridSize, difficulty }: GameOverProps) {
       }, delay + 400);
       timeoutsRef.current.push(endId);
     });
+    // When last letter has finished exploding, mark complete and remove overlay from DOM (BUG 3: no leftover label)
+    const cleanupId = setTimeout(() => {
+      setAnimationComplete(true);
+    }, lastDelay + 400 + 50);
+    timeoutsRef.current.push(cleanupId);
     return () => {
       timeoutsRef.current.forEach(clearTimeout);
       timeoutsRef.current = [];
     };
   }, [show]);
+
+  if (animationComplete) return null;
 
   const info     = GRID_INFO[gridSize as 0 | 1 | 2];
   const diffInfo = DIFF_INFO[difficulty as 0 | 1 | 2];

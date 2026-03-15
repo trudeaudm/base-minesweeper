@@ -1,13 +1,14 @@
 import { useReadContract } from "wagmi";
 import { MINESWEEPER_ABI } from "@/abis/Minesweeper";
-import { CONTRACT_ADDRESS, GRID_SMALL, GRID_MEDIUM, GRID_LARGE, DIFF_EASY, DIFF_NORMAL, DIFF_HARD } from "@/lib/config";
+import { CONTRACT_ADDRESS, CHAIN_ID, GRID_SMALL, GRID_MEDIUM, GRID_LARGE, DIFF_EASY, DIFF_NORMAL, DIFF_HARD } from "@/lib/config";
 
 export function usePoolHealth() {
   const { data, isLoading, refetch } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi:     MINESWEEPER_ABI,
     functionName: "getPoolHealth",
-    query: { refetchInterval: 15_000 },
+    chainId: CHAIN_ID,
+    query:   { refetchInterval: 15_000, enabled: true },
   });
 
   return {
@@ -45,7 +46,8 @@ export function useGridAvailable(gridSize: number, difficulty: number) {
     abi:     MINESWEEPER_ABI,
     functionName: "isGridAvailable",
     args:    [gridSize, difficulty],
-    query:   { refetchInterval: 15_000 },
+    chainId: CHAIN_ID,
+    query:   { refetchInterval: 15_000, enabled: true },
   });
   return data ?? false;
 }
@@ -57,21 +59,24 @@ export function useMinPoolThresholds(): Record<number, bigint> {
     abi:     MINESWEEPER_ABI,
     functionName: "gridConfigs",
     args:    [GRID_SMALL],
-    query:   { refetchInterval: 15_000 },
+    chainId: CHAIN_ID,
+    query:   { refetchInterval: 15_000, enabled: true },
   });
   const medium = useReadContract({
     address: CONTRACT_ADDRESS,
     abi:     MINESWEEPER_ABI,
     functionName: "gridConfigs",
     args:    [GRID_MEDIUM],
-    query:   { refetchInterval: 15_000 },
+    chainId: CHAIN_ID,
+    query:   { refetchInterval: 15_000, enabled: true },
   });
   const large  = useReadContract({
     address: CONTRACT_ADDRESS,
     abi:     MINESWEEPER_ABI,
     functionName: "gridConfigs",
     args:    [GRID_LARGE],
-    query:   { refetchInterval: 15_000 },
+    chainId: CHAIN_ID,
+    query:   { refetchInterval: 15_000, enabled: true },
   });
   // gridConfigs returns (totalTiles, entryFee, maxPayoutBPS, maxConcurrent, minPoolThreshold, active)
   return {
