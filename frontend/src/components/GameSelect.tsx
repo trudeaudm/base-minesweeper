@@ -22,6 +22,20 @@ interface GameSelectProps {
 
 const GRIDS = [GRID_SMALL, GRID_MEDIUM, GRID_LARGE] as const;
 const DIFFS = [DIFF_EASY, DIFF_NORMAL, DIFF_HARD]   as const;
+const PREFERRED_GRID_KEY = "preferred_grid_size";
+const PREFERRED_DIFF_KEY = "preferred_difficulty";
+
+function getInitialGridSize(): number {
+  const raw = sessionStorage.getItem(PREFERRED_GRID_KEY);
+  const parsed = raw === null ? NaN : Number(raw);
+  return GRIDS.includes(parsed as (typeof GRIDS)[number]) ? parsed : GRID_SMALL;
+}
+
+function getInitialDifficulty(): number {
+  const raw = sessionStorage.getItem(PREFERRED_DIFF_KEY);
+  const parsed = raw === null ? NaN : Number(raw);
+  return DIFFS.includes(parsed as (typeof DIFFS)[number]) ? parsed : DIFF_NORMAL;
+}
 
 function GridOption({
   gridSize,
@@ -83,8 +97,8 @@ function GridOption({
 }
 
 export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps) {
-  const [selectedGrid, setSelectedGrid] = useState<number>(GRID_SMALL);
-  const [selectedDiff, setSelectedDiff] = useState<number>(DIFF_NORMAL);
+  const [selectedGrid, setSelectedGrid] = useState<number>(() => getInitialGridSize());
+  const [selectedDiff, setSelectedDiff] = useState<number>(() => getInitialDifficulty());
 
   const { gridInfo, isLoading: gridConfigLoading } = useGridConfigs();
   const minPoolThresholds = useMinPoolThresholds();
@@ -132,7 +146,10 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
               difficulty={selectedDiff}
               info={gridInfo?.[g]}
               selected={selectedGrid === g}
-              onSelect={() => setSelectedGrid(g)}
+              onSelect={() => {
+                setSelectedGrid(g);
+                sessionStorage.setItem(PREFERRED_GRID_KEY, String(g));
+              }}
               available={g === GRID_SMALL ? availableSmall : g === GRID_MEDIUM ? availableMedium : availableLarge}
               requiredPoolLabel={formatEth(minPoolThresholds[g] ?? 0n, 4)}
             />
@@ -155,7 +172,10 @@ export function GameSelect({ onStart, isStarting, poolBalance }: GameSelectProps
             return (
               <button
                 key={d}
-                onClick={() => setSelectedDiff(d)}
+                onClick={() => {
+                  setSelectedDiff(d);
+                  sessionStorage.setItem(PREFERRED_DIFF_KEY, String(d));
+                }}
                 className={`
                   py-2.5 rounded-[4px] font-medium text-sm transition-all
                   ${sel
