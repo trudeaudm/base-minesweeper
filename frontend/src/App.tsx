@@ -10,7 +10,7 @@ import { WinScreen } from "@/components/WinScreen";
 import { GameOverScreen } from "@/components/GameOverScreen";
 import { useGame } from "@/hooks/useGame";
 import { usePoolHealth } from "@/hooks/usePoolHealth";
-import { GameStatus, GRID_LAYOUT } from "@/lib/config";
+import { GameStatus } from "@/lib/config";
 
 type AppView = "select" | "playing";
 
@@ -107,143 +107,47 @@ function GameApp() {
 
         {view === "playing" && (
           <div className="w-full max-w-sm space-y-5">
-            {/* WAITING_VRF: show loading screen with decorative tile grid; no real board yet */}
-            {gameState.status === GameStatus.WAITING_VRF ? (
-              <div className="w-full max-w-xs mx-auto flex flex-col items-center justify-center py-8" aria-busy="true">
-                <div className="w-10 h-10 border-2 border-base-blue border-t-transparent rounded-full animate-spin" aria-hidden />
-                <p className="mt-4 text-gray-600 text-sm">Generating provably fair randomness...</p>
-                <div className="mt-6 w-full">
-                  <LoadingTileGrid gridSize={gameState.gridSize as 0 | 1 | 2} />
-                </div>
-                <GameStatusBar
-                  gridSize={gameState.gridSize}
-                  difficulty={gameState.difficulty}
-                  entryFee={gameState.entryFee}
-                  maxPayout={gameState.maxPayout}
-                  currentPayout={0n}
-                  multiplier={0}
-                  safeRevealed={0}
-                  totalSafe={gameState.totalSafe}
-                  status={gameState.status}
-                  onCashOut={() => {}}
-                  isCashingOut={false}
-                  isWaitingFirstFlip={false}
-                  isWaitingVRF={true}
-                  cancelBlockDataReady={cancelBlockDataReady}
-                  blocksUntilCancel={blocksUntilCancel}
-                  canCancel={canCancel}
-                  cancelThresholdBlocks={cancelThresholdBlocks}
-                  onCancelGame={handleCancelGame}
-                  isCancelling={isCancelling}
-                />
-              </div>
-            ) : !isGameDataReady ? (
-              <div
-                className="grid gap-1.5 w-full max-w-xs mx-auto pointer-events-none"
-                style={{
-                  gridTemplateColumns: `repeat(${GRID_LAYOUT[gameState.gridSize as 0 | 1 | 2].cols}, 1fr)`,
-                }}
-                role="presentation"
-                aria-busy="true"
-                aria-hidden
-              >
-                {Array.from(
-                  { length: GRID_LAYOUT[gameState.gridSize as 0 | 1 | 2].rows * GRID_LAYOUT[gameState.gridSize as 0 | 1 | 2].cols },
-                  (_, i) => {
-                    const dirs = ["left", "right", "up", "down"] as const;
-                    const seed = (i * 1103515245 + 12345) & 0x7fffffff;
-                    const dir = dirs[seed % 4];
-                    const flyClass =
-                      dir === "left"
-                        ? "animate-tile-fly-left"
-                        : dir === "right"
-                          ? "animate-tile-fly-right"
-                          : dir === "up"
-                            ? "animate-tile-fly-up"
-                            : "animate-tile-fly-down";
-                    return (
-                      <div
-                        key={i}
-                        className={`
-                          rounded-[3px] w-full aspect-square
-                          bg-base-blue border border-blue-400/25 shadow-tile
-                          ${flyClass}
-                        `}
-                      />
-                    );
-                  }
-                )}
+            {/* Status bar — always when playing (includes cancel during VRF) */}
+            <GameStatusBar
+              gridSize={gameState.gridSize}
+              difficulty={gameState.difficulty}
+              entryFee={gameState.entryFee}
+              maxPayout={gameState.maxPayout}
+              currentPayout={gameState.currentPayout}
+              multiplier={gameState.multiplier}
+              safeRevealed={gameState.safeRevealed}
+              totalSafe={gameState.totalSafe}
+              status={gameState.status}
+              onCashOut={cashOut}
+              isCashingOut={isCashingOut}
+              isWaitingFirstFlip={gameState.isWaitingFirstFlip}
+              isWaitingVRF={gameState.status === GameStatus.WAITING_VRF}
+              cancelBlockDataReady={cancelBlockDataReady}
+              blocksUntilCancel={blocksUntilCancel}
+              canCancel={canCancel}
+              cancelThresholdBlocks={cancelThresholdBlocks}
+              onCancelGame={handleCancelGame}
+              isCancelling={isCancelling}
+            />
+
+            {/* Grid area: LoadingTileGrid only when data not ready; crossfade when ready */}
+            {!isGameDataReady ? (
+              <div className="w-full max-w-xs mx-auto relative" aria-busy="true">
+                <LoadingTileGrid gridSize={gameState.gridSize as 0 | 1 | 2} />
               </div>
             ) : (
               <>
-                {/* Status bar */}
-                <GameStatusBar
-                  gridSize={gameState.gridSize}
-                  difficulty={gameState.difficulty}
-                  entryFee={gameState.entryFee}
-                  maxPayout={gameState.maxPayout}
-                  currentPayout={gameState.currentPayout}
-                  multiplier={gameState.multiplier}
-                  safeRevealed={gameState.safeRevealed}
-                  totalSafe={gameState.totalSafe}
-                  status={gameState.status}
-                  onCashOut={cashOut}
-                  isCashingOut={isCashingOut}
-                  isWaitingFirstFlip={gameState.isWaitingFirstFlip}
-                  isWaitingVRF={gameState.isWaitingVRF}
-                  cancelBlockDataReady={cancelBlockDataReady}
-                  blocksUntilCancel={blocksUntilCancel}
-                  canCancel={canCancel}
-                  cancelThresholdBlocks={cancelThresholdBlocks}
-                  onCancelGame={handleCancelGame}
-                  isCancelling={isCancelling}
-                />
-
                 {/* Crossfade: loading grid fades out (300ms) while real board fades in; same space, no layout shift */}
                 <div className="w-full max-w-xs mx-auto relative">
-                  {/* Loading placeholder — stays mounted during fade so fly animation can finish */}
                   <div
-                    className={`grid gap-1.5 w-full pointer-events-none transition-opacity duration-300 ${
+                    className={`w-full pointer-events-none transition-opacity duration-300 ${
                       boardFadeComplete ? "opacity-0" : "opacity-100"
                     }`}
-                    style={{
-                      gridTemplateColumns: `repeat(${GRID_LAYOUT[gameState.gridSize as 0 | 1 | 2].cols}, 1fr)`,
-                    }}
                     role="presentation"
                     aria-hidden
                   >
-                    {Array.from(
-                      {
-                        length:
-                          GRID_LAYOUT[gameState.gridSize as 0 | 1 | 2].rows *
-                          GRID_LAYOUT[gameState.gridSize as 0 | 1 | 2].cols,
-                      },
-                      (_, i) => {
-                        const dirs = ["left", "right", "up", "down"] as const;
-                        const seed = (i * 1103515245 + 12345) & 0x7fffffff;
-                        const dir = dirs[seed % 4];
-                        const flyClass =
-                          dir === "left"
-                            ? "animate-tile-fly-left"
-                            : dir === "right"
-                              ? "animate-tile-fly-right"
-                              : dir === "up"
-                                ? "animate-tile-fly-up"
-                                : "animate-tile-fly-down";
-                        return (
-                          <div
-                            key={i}
-                            className={`
-                              rounded-[3px] w-full aspect-square
-                              bg-base-blue border border-blue-400/25 shadow-tile
-                              ${flyClass}
-                            `}
-                          />
-                        );
-                      }
-                    )}
+                    <LoadingTileGrid gridSize={gameState.gridSize as 0 | 1 | 2} />
                   </div>
-                  {/* Real board — fades in over same area */}
                   <div
                     className={`absolute inset-0 transition-opacity duration-300 ${
                       boardFadeComplete ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"

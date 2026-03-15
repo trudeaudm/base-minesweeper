@@ -145,12 +145,16 @@ export function LoadingTileGrid({ gridSize }: { gridSize: 0 | 1 | 2 }) {
           to   { transform: translate(0, 0); }
         }
       `}</style>
+      {/* Same outer container and grid structure as GameBoard for seamless crossfade */}
       <div
-        className="grid gap-1.5 w-full max-w-xs mx-auto pointer-events-none"
-        style={{ gridTemplateColumns: `repeat(${layout.cols}, 1fr)` }}
+        className="w-full max-w-xs mx-auto relative pointer-events-none"
         role="presentation"
         aria-hidden
       >
+        <div
+          className="grid gap-1.5"
+          style={{ gridTemplateColumns: `repeat(${layout.cols}, 1fr)` }}
+        >
         {tiles.map((tile, i) => {
           const isOut = tile.phase === "out";
           const isIn = tile.phase === "in";
@@ -187,6 +191,7 @@ export function LoadingTileGrid({ gridSize }: { gridSize: 0 | 1 | 2 }) {
             />
           );
         })}
+        </div>
       </div>
     </>
   );
