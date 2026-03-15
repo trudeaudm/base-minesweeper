@@ -134,7 +134,10 @@ export function WinScreen({ payout, entryFee, gridSize, difficulty, onPlayAgain 
         <h1 className="text-4xl font-bold text-white mb-2 animate-bounce-in">
           You Won!
         </h1>
-        <p className="text-white/70 text-sm mb-8">
+        <p
+          className="text-white/70 text-sm mb-8"
+          style={{ textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}
+        >
           {gridLabel} · <span className={diffInfo.color}>{diffInfo.label}</span>
         </p>
 
@@ -160,7 +163,7 @@ export function WinScreen({ payout, entryFee, gridSize, difficulty, onPlayAgain 
             transition-all duration-200 shadow-xl
           "
         >
-          Play Again
+          Confirm
         </button>
       </div>
     </>

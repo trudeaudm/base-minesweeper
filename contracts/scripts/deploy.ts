@@ -46,7 +46,7 @@ async function main() {
     await seedTx.wait();
     console.log("✓ Pool seeded");
   } else {
-    console.log("Skipping pool seed (SEED_AMOUNT_ETH=0). Seed later with: COMMAND=seed AMOUNT_ETH=<amount>");
+    console.log("Skipping pool seed (SEED_AMOUNT_ETH=0). Seed later via admin page.");
   }
 
   // ── Post-deployment Checklist ─────────────────────────────────

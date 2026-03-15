@@ -10,7 +10,7 @@ import { WinScreen } from "@/components/WinScreen";
 import { GameOverScreen } from "@/components/GameOverScreen";
 import { useGame } from "@/hooks/useGame";
 import { usePoolHealth } from "@/hooks/usePoolHealth";
-import { GameStatus } from "@/lib/config";
+import { GameStatus, GRID_LAYOUT } from "@/lib/config";
 
 type AppView = "select" | "playing";
 
@@ -127,9 +127,41 @@ function GameApp() {
                 />
               </div>
             ) : !isGameDataReady ? (
-              <div className="w-full max-w-xs mx-auto flex flex-col items-center justify-center py-16" aria-busy="true">
-                <div className="w-10 h-10 border-2 border-base-blue border-t-transparent rounded-full animate-spin" aria-hidden />
-                <p className="mt-4 text-gray-600 text-sm">Loading game...</p>
+              <div
+                className="grid gap-1.5 w-full max-w-xs mx-auto pointer-events-none"
+                style={{
+                  gridTemplateColumns: `repeat(${GRID_LAYOUT[gameState.gridSize as 0 | 1 | 2].cols}, 1fr)`,
+                }}
+                role="presentation"
+                aria-busy="true"
+                aria-hidden
+              >
+                {Array.from(
+                  { length: GRID_LAYOUT[gameState.gridSize as 0 | 1 | 2].rows * GRID_LAYOUT[gameState.gridSize as 0 | 1 | 2].cols },
+                  (_, i) => {
+                    const dirs = ["left", "right", "up", "down"] as const;
+                    const seed = (i * 1103515245 + 12345) & 0x7fffffff;
+                    const dir = dirs[seed % 4];
+                    const flyClass =
+                      dir === "left"
+                        ? "animate-tile-fly-left"
+                        : dir === "right"
+                          ? "animate-tile-fly-right"
+                          : dir === "up"
+                            ? "animate-tile-fly-up"
+                            : "animate-tile-fly-down";
+                    return (
+                      <div
+                        key={i}
+                        className={`
+                          rounded-[3px] w-full aspect-square
+                          bg-base-blue border border-blue-400/25 shadow-tile
+                          ${flyClass}
+                        `}
+                      />
+                    );
+                  }
+                )}
               </div>
             ) : (
               <>

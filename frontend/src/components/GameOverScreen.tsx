@@ -19,7 +19,7 @@ function getLetterExplodeDelay(index: number): number {
   return base + index * perLetter + (jitter % 90);
 }
 
-export function GameOverScreen({ gridSize, difficulty }: GameOverProps) {
+export function GameOverScreen({ gridSize, difficulty, onPlayAgain }: GameOverProps) {
   const [show, setShow] = useState(false);
   const [explodingLetters, setExplodingLetters] = useState<Set<number>>(new Set());
   const [explodedLetters, setExplodedLetters] = useState<Set<number>>(new Set());
@@ -103,9 +103,26 @@ export function GameOverScreen({ gridSize, difficulty }: GameOverProps) {
         </h1>
       </div>
       {/* Optional small label so overlay context is clear; still no background */}
-      /*<p className="mt-4 text-white/80 text-sm drop-shadow-md">
+      <p
+        className="mt-4 text-white/80 text-sm drop-shadow-md"
+        style={{ textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}
+      >
         {gridLabel} · <span className={diffInfo.color}>{diffInfo.label}</span>
-      </p>*/
+      </p>
+      <div className="mt-8 pointer-events-auto">
+        <button
+          type="button"
+          onClick={onPlayAgain}
+          className="
+            px-10 py-4 bg-white text-base-blue
+            rounded-[6px] font-bold text-lg
+            hover:bg-white/90 active:scale-95
+            transition-all duration-200 shadow-xl
+          "
+        >
+          Confirm
+        </button>
+      </div>
     </div>
   );
 }

@@ -208,7 +208,7 @@ export function useGame() {
   const [burstRevealOrder, setBurstRevealOrder] = useState<number[]>([]);
 
   const { gridInfo } = useGridConfigs();
-  const FLIP_BATCH_DELAY_MS = 800;
+  const FLIP_BATCH_DELAY_MS = 1000;
 
   // ── Current block number (for block-based cancel countdown) ───────────────
   // Poll block number instead of watch (avoids "filter not found" on Alchemy/HTTP RPCs)
