@@ -244,9 +244,12 @@ export function GameBoard({
       >
         {tileStates.map((state, i) => {
           const burstIdx = burstRevealOrder.indexOf(i);
+          // Only lock unrevealed tiles from: 50ms debounce (isFlipPending), VRF wait, game over, or cashed out.
+          // Do not use pendingTiles/pendingTilesRef or !active here — that greys tiles before the 50ms window.
           const disabled =
             waitingForVrfResponse ||
-            !active ||
+            isGameOver ||
+            isWinReveal ||
             state !== "unrevealed" ||
             isFlipPending;
           return (
