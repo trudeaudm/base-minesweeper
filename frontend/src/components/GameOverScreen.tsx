@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { BaseMineIcon } from "./BaseLogo";
-import { formatEth, GRID_INFO, DIFF_INFO } from "@/lib/config";
+import { GRID_INFO, DIFF_INFO } from "@/lib/config";
 
 interface GameOverProps {
   entryFee:   bigint;
@@ -19,7 +18,7 @@ function getLetterExplodeDelay(index: number): number {
   return base + index * perLetter + (jitter % 90);
 }
 
-export function GameOverScreen({ entryFee, gridSize, difficulty, onPlayAgain }: GameOverProps) {
+export function GameOverScreen({ gridSize, difficulty }: GameOverProps) {
   const [show, setShow] = useState(false);
   const [explodingLetters, setExplodingLetters] = useState<Set<number>>(new Set());
   const [explodedLetters, setExplodedLetters] = useState<Set<number>>(new Set());
@@ -58,21 +57,22 @@ export function GameOverScreen({ entryFee, gridSize, difficulty, onPlayAgain }: 
   const info     = GRID_INFO[gridSize as 0 | 1 | 2];
   const diffInfo = DIFF_INFO[difficulty as 0 | 1 | 2];
 
+  // Overlay only: transparent background, RUGGED text and letter explosion. Board remains visible; no Try Again (use New Game below grid).
   return (
     <div
       className={`
-        fixed inset-0 z-50 flex flex-col items-center justify-center
-        bg-black/95 backdrop-blur-sm
+        fixed inset-0 z-40 pointer-events-none flex flex-col items-center justify-center
         transition-opacity duration-500
         ${show ? "opacity-100" : "opacity-0"}
       `}
+      style={{ background: "transparent" }}
+      aria-hidden
     >
       {/* RUGGED: flies in then each letter explodes with stagger */}
-      <div className="mb-8 flex justify-center overflow-visible">
+      <div className="flex justify-center overflow-visible">
         <h1
-          className="inline-flex text-6xl sm:text-7xl font-black tracking-tighter text-white animate-rugged-slide-in"
-          style={{ fontFamily: "Coinbase Sans, Inter, sans-serif" }}
-          aria-hidden
+          className="inline-flex text-6xl sm:text-7xl font-black tracking-tighter text-white animate-rugged-slide-in drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
+          style={{ fontFamily: "Coinbase Sans, Inter, sans-serif", textShadow: "0 2px 12px rgba(0,0,0,0.9)" }}
         >
           {RUGGED_LETTERS.map((letter, i) => (
             <span
@@ -89,37 +89,10 @@ export function GameOverScreen({ entryFee, gridSize, difficulty, onPlayAgain }: 
           ))}
         </h1>
       </div>
-
-      {/* Exploded icon */}
-      <div className="animate-bounce-in mb-6">
-        <div className="w-24 h-24 bg-mine rounded-[12px] flex items-center justify-center shadow-tile-mine">
-          <BaseMineIcon size={56} />
-        </div>
-      </div>
-
-      <p className="text-white/50 text-sm mb-8">
+      {/* Optional small label so overlay context is clear; still no background */}
+      <p className="mt-4 text-white/80 text-sm drop-shadow-md">
         {info.label} · <span className={diffInfo.color}>{diffInfo.label}</span>
       </p>
-
-      <div className="text-center mb-8">
-        <div className="text-white/40 text-xs uppercase tracking-widest mb-1">You lost</div>
-        <div className="text-3xl font-mono font-bold text-mine">
-          {formatEth(entryFee, 4)} ETH
-        </div>
-        <p className="text-white/30 text-sm mt-2">Hit a mine — better luck next time</p>
-      </div>
-
-      <button
-        onClick={onPlayAgain}
-        className="
-          px-10 py-4 bg-base-blue text-white
-          rounded-[6px] font-bold text-lg
-          hover:bg-blue-500 active:scale-95
-          transition-all duration-200 shadow-xl
-        "
-      >
-        Try Again
-      </button>
     </div>
   );
 }
