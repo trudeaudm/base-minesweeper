@@ -1,5 +1,4 @@
 import { formatEth, GameStatus, DIFF_INFO } from "@/lib/config";
-import { useGridConfigs } from "@/hooks/useGridConfigs";
 
 interface GameStatusProps {
   gridSize:           number;
@@ -45,15 +44,11 @@ export function GameStatusBar({
   onCancelGame,
   isCancelling,
 }: GameStatusProps) {
-  const { gridInfo } = useGridConfigs();
-  const info       = gridInfo?.[gridSize as 0 | 1 | 2];
   const diffInfo   = DIFF_INFO[difficulty as 0 | 1 | 2];
   const isActive   = status === GameStatus.ACTIVE;
   const canCashout = isActive && safeRevealed > 0;
   const showCancelUI = isWaitingVRF && cancelBlockDataReady;
-  const gridLabel = info?.label ?? "…";
 
-  const progressPct = totalSafe > 0 ? (safeRevealed / totalSafe) * 100 : 0;
   const multiplierColor =
     multiplier >= 1.5
       ? "text-accent-green"
@@ -63,42 +58,6 @@ export function GameStatusBar({
 
   return (
     <div className="w-full max-w-xs mx-auto space-y-3">
-      {/* Grid info row */}
-      <div className="flex items-center justify-between text-xs text-gray-500">
-        <span className="font-mono">
-          {gridLabel} &nbsp;·&nbsp;
-          <span className={diffInfo.color}>{diffInfo.label}</span>
-        </span>
-        <span
-          className="font-mono text-[10px] text-gray-400"
-          title="Entry fee plus ~0.0001 ETH gas reserve for session key"
-        >
-          Entry {formatEth(entryFee, 4)} ETH
-        </span>
-      </div>
-
-      {/* Progress bar — fraction only, no "safe tiles" label; tooltip for accessibility */}
-      <div
-        className="mb-0.5"
-        role="progressbar"
-        aria-valuenow={safeRevealed}
-        aria-valuemin={0}
-        aria-valuemax={totalSafe}
-        aria-label={`Safe tiles revealed: ${safeRevealed} of ${totalSafe}`}
-        title={`${safeRevealed} / ${totalSafe} safe tiles (${progressPct.toFixed(0)}%)`}
-      >
-        <div className="flex justify-between text-xs mb-1">
-          <span className="text-gray-400 font-mono tabular-nums">{safeRevealed} / {totalSafe}</span>
-          <span className="text-gray-400 tabular-nums">{progressPct.toFixed(0)}%</span>
-        </div>
-        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-base-blue rounded-full transition-all duration-300"
-            style={{ width: `${progressPct}%` }}
-          />
-        </div>
-      </div>
-
       {/* Multiplier and current win — labels small/muted, values dominant */}
       <div className="flex items-center justify-between">
         <div>
@@ -117,16 +76,6 @@ export function GameStatusBar({
           </div>
         </div>
       </div>
-
-      {/* Prompt: click any tile to start */}
-      {isWaitingFirstFlip && (
-        <div className="text-center py-3">
-          <div className="inline-flex items-center gap-2 text-accent-green text-sm font-medium">
-            <div className="w-2 h-2 bg-accent-green rounded-full animate-pulse" />
-            Click any tile to begin — your first click is always safe!
-          </div>
-        </div>
-      )}
 
       {/* Shown only when status is WAITING_VRF (loading screen); board not visible yet */}
       {isWaitingVRF && (

@@ -43,6 +43,8 @@ function GameApp() {
 
   const [cancelledMessage, setCancelledMessage] = useState<string | null>(null);
   const [boardFadeComplete, setBoardFadeComplete] = useState(false);
+  const [showFirstClickHint, setShowFirstClickHint] = useState(false);
+  const [hintFadeIn, setHintFadeIn] = useState(false);
 
   // When real board data becomes ready, crossfade from loading grid to board over 300ms
   useEffect(() => {
@@ -54,6 +56,24 @@ function GameApp() {
     return () => clearTimeout(id);
   }, [isGameDataReady]);
 
+  // 5s delay then show "Click any tile to begin" hint; reset when leaving WAITING_FIRST_FLIP
+  useEffect(() => {
+    if (!gameState.isWaitingFirstFlip) {
+      setShowFirstClickHint(false);
+      setHintFadeIn(false);
+      return;
+    }
+    const t = setTimeout(() => setShowFirstClickHint(true), 5000);
+    return () => clearTimeout(t);
+  }, [gameState.isWaitingFirstFlip]);
+
+  // Fade-in the hint overlay over 600ms when it mounts
+  useEffect(() => {
+    if (!showFirstClickHint) return;
+    const id = requestAnimationFrame(() => setHintFadeIn(true));
+    return () => cancelAnimationFrame(id);
+  }, [showFirstClickHint]);
+
   const hasGame = gameState.gameId !== null;
   const view: AppView = hasGame ? "playing" : "select";
 
@@ -62,6 +82,11 @@ function GameApp() {
     if (success) {
       setCancelledMessage("Game cancelled — your ETH has been refunded");
     }
+  };
+
+  const handleFlip = (index: number) => {
+    setShowFirstClickHint(false);
+    flipTile(index);
   };
 
   return (
@@ -159,7 +184,7 @@ function GameApp() {
                       mineBitmask={gameState.mineBitmask}
                       revealedAdjacency={gameState.revealedAdjacency}
                       status={gameState.status}
-                      onFlip={flipTile}
+                      onFlip={handleFlip}
                       isCashout={gameState.safeRevealed > 0 && gameState.isActive}
                       pendingTilesRef={pendingTilesRef}
                       isFlipPending={isFlipPending}
@@ -170,20 +195,27 @@ function GameApp() {
                       explosionComplete={explosionComplete}
                     />
                   </div>
-                </div>
 
-                {/* Session key indicator — hide when game over */}
-                {gameState.sessionKeyAddr && !gameState.isGameOver && (
-                  <div className="px-3 py-2 bg-gray-100 rounded-[4px] flex items-center justify-between">
-                    <span className="text-xs text-gray-500">Session key active</span>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 bg-accent-green rounded-full animate-pulse" />
-                      <span className="text-xs font-mono text-gray-500 truncate max-w-[140px]">
-                        {gameState.sessionKeyAddr}
-                      </span>
-                    </div>
-                  </div>
-                )}
+                  {/* Hint overlay: "Click any tile to begin" after 5s in WAITING_FIRST_FLIP; pointer-events-none so tiles stay clickable */}
+                  {isGameDataReady &&
+                    boardFadeComplete &&
+                    gameState.isWaitingFirstFlip &&
+                    showFirstClickHint && (
+                      <div
+                        className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-[600ms] ${
+                          hintFadeIn ? "opacity-100" : "opacity-0"
+                        }`}
+                        aria-hidden
+                      >
+                        <p
+                          className="text-center font-bold text-lg px-4 animate-pulse"
+                          style={{ color: "#06D6A0" }}
+                        >
+                          Click any tile to begin — your first click is always safe!
+                        </p>
+                      </div>
+                    )}
+                </div>
 
                 {/* Back to new game — when game is over */}
                 {gameState.isGameOver && (
